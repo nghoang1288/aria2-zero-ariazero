@@ -81,26 +81,21 @@ cat <<EOF > "$SMB_CONF"
    read only = no
 EOF
 
-if [ -n "$SMB_USER" ] && [ -n "$SMB_PASSWORD" ]; then
-    echo "Configuring Samba with authenticated access (User: ${SMB_USER})..."
-    # Create system user if it doesn't exist (Debian useradd)
-    if ! id "$SMB_USER" >/dev/null 2>&1; then
-        useradd -M -s /usr/sbin/nologin "$SMB_USER"
-    fi
-    # Set Samba password
-    (echo "$SMB_PASSWORD"; echo "$SMB_PASSWORD") | smbpasswd -a -s "$SMB_USER"
-    
-    cat <<EOF >> "$SMB_CONF"
+SMB_USER="${SMB_USER:-admin}"
+SMB_PASSWORD="${SMB_PASSWORD:-123456}"
+
+echo "Configuring Samba with authenticated access (User: ${SMB_USER})..."
+# Create system user if it doesn't exist (Debian useradd)
+if ! id "$SMB_USER" >/dev/null 2>&1; then
+    useradd -M -s /usr/sbin/nologin "$SMB_USER"
+fi
+# Set Samba password
+(echo "$SMB_PASSWORD"; echo "$SMB_PASSWORD") | smbpasswd -a -s "$SMB_USER"
+
+cat <<EOF >> "$SMB_CONF"
    guest ok = no
    valid users = $SMB_USER
 EOF
-else
-    echo "Configuring Samba with Guest access (No authentication required)..."
-    cat <<EOF >> "$SMB_CONF"
-   guest ok = yes
-   public = yes
-EOF
-fi
 
 # Execute supervisor
 echo "Starting Supervisor process manager..."
