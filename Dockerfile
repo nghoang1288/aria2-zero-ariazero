@@ -1,3 +1,12 @@
+# Stage 1: Build the React Frontend WebUI
+FROM node:20-slim AS webui-builder
+WORKDIR /webui
+COPY webui/package*.json ./
+RUN npm install
+COPY webui/ ./
+RUN npm run build
+
+# Stage 2: Download the matching architecture of aria2-zero
 FROM debian:stable-slim AS builder
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -8,14 +17,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 ARG TARGETARCH
 
-# Download AriaNg static files
-RUN curl -L -o /tmp/ariang.zip https://github.com/mayswind/AriaNg/releases/download/1.3.13/AriaNg-1.3.13.zip \
-    && mkdir -p /tmp/ariang \
-    && unzip /tmp/ariang.zip -d /tmp/ariang
-
-# Download the matching architecture of aria2-zero
-# AMD64 uses v2026.06.10-release.1
-# ARM64 falls back to v2025.04.06-release.1
 RUN mkdir -p /tmp/aria2 && \
     if [ "$TARGETARCH" = "amd64" ] || [ "$TARGETARCH" = "x86_64" ] || [ -z "$TARGETARCH" ]; then \
         curl -L -o /tmp/aria2.zip https://github.com/zeromake/aria2-zero/releases/download/v2026.06.10-release.1/aria2-linux-x86_64.zip; \
@@ -26,6 +27,7 @@ RUN mkdir -p /tmp/aria2 && \
     fi && \
     unzip /tmp/aria2.zip -d /tmp/aria2
 
+# Stage 3: Runtime container
 FROM debian:stable-slim
 
 # Install runtime dependencies: nginx, samba, supervisor, etc.
@@ -37,23 +39,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     procps \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy aria2c binary and AriaNg static files from builder
+# Copy aria2c binary from builder stage
 COPY --from=builder /tmp/aria2/bin/aria2c /usr/local/bin/aria2c
 RUN chmod +x /usr/local/bin/aria2c
 
-# Remove default nginx pages and copy AriaNg files
+# Remove default nginx pages and copy the compiled AriaZero React frontend
 RUN rm -rf /var/www/html/*
-COPY --from=builder /tmp/ariang/ /var/www/html/
-COPY custom.css /var/www/html/custom.css
-COPY apply_settings.js /var/www/html/apply_settings.js
-
-# Pre-configure AriaNg to dynamically connect to the current host and port via WebSockets
-RUN sed -i 's/rpcHost:""/rpcHost:location.hostname/g' /var/www/html/js/aria-ng-*.js && \
-    sed -i 's/rpcPort:"6800"/rpcPort:(location.port?location.port:(location.protocol==="https:"?"443":"80"))/g' /var/www/html/js/aria-ng-*.js && \
-    sed -i 's/protocol:"http"/protocol:(location.protocol==="https:"?"wss":"ws")/g' /var/www/html/js/aria-ng-*.js
-
-# Inject dynamic setting config script and custom stylesheet into index.html
-RUN sed -i 's|</head>|<script src="config.js"></script><script src="apply_settings.js"></script><link rel="stylesheet" href="custom.css"></head>|g' /var/www/html/index.html
+COPY --from=webui-builder /webui/dist/ /var/www/html/
 
 # Copy configurations
 COPY nginx.conf /etc/nginx/sites-available/default
@@ -62,7 +54,7 @@ COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
 
 # Expose ports:
-# 80: AriaNg WebUI (Nginx)
+# 80: AriaZero WebUI (Nginx)
 # 6800: Aria2 RPC (Direct access if needed)
 # 445: SMB Server (Samba)
 EXPOSE 80 6800 445
