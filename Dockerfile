@@ -45,6 +45,11 @@ RUN chmod +x /usr/local/bin/aria2c
 RUN rm -rf /var/www/html/*
 COPY --from=builder /tmp/ariang/ /var/www/html/
 
+# Pre-configure AriaNg to dynamically connect to the current host and port via WebSockets
+RUN sed -i 's/rpcHost:""/rpcHost:location.hostname/g' /var/www/html/aria-ng-*.js && \
+    sed -i 's/rpcPort:"6800"/rpcPort:(location.port?location.port:(location.protocol==="https:"?"443":"80"))/g' /var/www/html/aria-ng-*.js && \
+    sed -i 's/protocol:"http"/protocol:(location.protocol==="https:"?"wss":"ws")/g' /var/www/html/aria-ng-*.js
+
 # Copy configurations
 COPY nginx.conf /etc/nginx/sites-available/default
 COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
