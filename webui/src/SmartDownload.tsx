@@ -7,6 +7,7 @@ import { useState, useEffect, useCallback, useRef, createContext, useContext } f
 interface SmartDownloadProps {
   children: React.ReactNode;
   onLinkDetected: (url: string) => void;
+  onTorrentDetected?: (base64: string, filename: string) => void;
 }
 
 interface SmartDownloadContextValue {
@@ -50,16 +51,19 @@ function isInputElement(el: EventTarget | null): boolean {
 export function SmartDownloadProvider({
   children,
   onLinkDetected,
-}: SmartDownloadProps): JSX.Element {
+  onTorrentDetected,
+}: SmartDownloadProps): React.ReactNode {
   const [isDragging, setIsDragging] = useState(false);
   const lastDetectedRef = useRef<string>('');
   const dragCounterRef = useRef(0);
 
   // Stable callback ref so listeners always see the latest function.
   const onLinkDetectedRef = useRef(onLinkDetected);
+  const onTorrentDetectedRef = useRef(onTorrentDetected);
   useEffect(() => {
     onLinkDetectedRef.current = onLinkDetected;
-  }, [onLinkDetected]);
+    onTorrentDetectedRef.current = onTorrentDetected;
+  }, [onLinkDetected, onTorrentDetected]);
 
   // -----------------------------------------------------------------------
   // Helper: emit a detected URL (deduplicates against the last one)
@@ -108,8 +112,7 @@ export function SmartDownloadProvider({
     try {
       navigator.registerProtocolHandler(
         'magnet',
-        window.location.origin + '/?uri=%s',
-        'AriaZero',
+        window.location.origin + '/?uri=%s'
       );
     } catch {
       // Registration may not be supported or allowed.
@@ -159,6 +162,27 @@ export function SmartDownloadProvider({
       e.stopPropagation();
       dragCounterRef.current = 0;
       setIsDragging(false);
+
+      // Check for files (e.g. .torrent files)
+      const files = e.dataTransfer?.files;
+      if (files && files.length > 0) {
+        for (let i = 0; i < files.length; i++) {
+          const file = files[i];
+          if (file.name.endsWith('.torrent') && onTorrentDetectedRef.current) {
+            const reader = new FileReader();
+            reader.onload = (event) => {
+              const result = event.target?.result as string;
+              if (result) {
+                const base64Data = result.split(',')[1];
+                if (base64Data) {
+                  onTorrentDetectedRef.current!(base64Data, file.name);
+                }
+              }
+            };
+            reader.readAsDataURL(file);
+          }
+        }
+      }
 
       const uriList = e.dataTransfer?.getData('text/uri-list');
       const plainText = e.dataTransfer?.getData('text/plain');

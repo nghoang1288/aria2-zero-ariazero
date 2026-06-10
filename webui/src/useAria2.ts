@@ -129,6 +129,22 @@ export function useAria2() {
   const [globalOptions, setGlobalOptions] = useState<Record<string, string>>({});
   const [events, setEvents] = useState<Aria2Event[]>([]);
 
+  // Task details and speed history states
+  const [selectedGid, setSelectedGid] = useState<string | null>(null);
+  const [taskPeers, setTaskPeers] = useState<any[]>([]);
+  const [taskServers, setTaskServers] = useState<any[]>([]);
+  const [speedHistory, setSpeedHistory] = useState<{ down: number[]; up: number[] }>({ down: [], up: [] });
+
+  const selectedGidRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    selectedGidRef.current = selectedGid;
+    if (!selectedGid) {
+      setTaskPeers([]);
+      setTaskServers([]);
+    }
+  }, [selectedGid]);
+
   const socketRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<number | null>(null);
   const pollIntervalRef = useRef<number | null>(null);
@@ -189,6 +205,12 @@ export function useAria2() {
 
     if (id === 'globalStat') {
       setGlobalStat(result);
+      const dl = Number(result.downloadSpeed) || 0;
+      const ul = Number(result.uploadSpeed) || 0;
+      setSpeedHistory(prev => ({
+        down: [...prev.down, dl].slice(-30),
+        up: [...prev.up, ul].slice(-30)
+      }));
     } else if (id === 'active') {
       setActiveTasks(result || []);
     } else if (id === 'waiting') {
@@ -197,6 +219,10 @@ export function useAria2() {
       setStoppedTasks(result || []);
     } else if (id === 'getGlobalOption') {
       setGlobalOptions(result || {});
+    } else if (id === 'getPeers') {
+      setTaskPeers(result || []);
+    } else if (id === 'getServers') {
+      setTaskServers(result || []);
     }
   }, []);
 
@@ -235,21 +261,31 @@ export function useAria2() {
       socket.onopen = () => {
         setStatus('connected');
         // Start polling immediately using refs (avoids stale closures)
-        sendBatchRpcRef.current([
+        const reqs: { method: string; id: string; params?: any[] }[] = [
           { method: 'aria2.getGlobalStat', id: 'globalStat' },
           { method: 'aria2.tellActive', id: 'active' },
           { method: 'aria2.tellWaiting', params: [0, 1000], id: 'waiting' },
           { method: 'aria2.tellStopped', params: [0, 1000], id: 'stopped' }
-        ]);
+        ];
+        if (selectedGidRef.current) {
+          reqs.push({ method: 'aria2.getPeers', params: [selectedGidRef.current], id: 'getPeers' });
+          reqs.push({ method: 'aria2.getServers', params: [selectedGidRef.current], id: 'getServers' });
+        }
+        sendBatchRpcRef.current(reqs);
         sendRpcRef.current('aria2.getGlobalOption', [], 'getGlobalOption');
         // Use ref-based poll for interval to always get fresh rpcSecret
         pollIntervalRef.current = setInterval(() => {
-          sendBatchRpcRef.current([
+          const pollReqs: { method: string; id: string; params?: any[] }[] = [
             { method: 'aria2.getGlobalStat', id: 'globalStat' },
             { method: 'aria2.tellActive', id: 'active' },
             { method: 'aria2.tellWaiting', params: [0, 1000], id: 'waiting' },
             { method: 'aria2.tellStopped', params: [0, 1000], id: 'stopped' }
-          ]);
+          ];
+          if (selectedGidRef.current) {
+            pollReqs.push({ method: 'aria2.getPeers', params: [selectedGidRef.current], id: 'getPeers' });
+            pollReqs.push({ method: 'aria2.getServers', params: [selectedGidRef.current], id: 'getServers' });
+          }
+          sendBatchRpcRef.current(pollReqs);
         }, 1000) as unknown as number;
       };
 
@@ -301,6 +337,10 @@ export function useAria2() {
   // User Actions
   const addUri = useCallback((uri: string) => {
     sendRpcRef.current('aria2.addUri', [[uri]], 'addUri');
+  }, []);
+
+  const addTorrent = useCallback((base64: string) => {
+    sendRpcRef.current('aria2.addTorrent', [base64], 'addTorrent');
   }, []);
 
   const pauseTask = useCallback((gid: string) => {
@@ -365,7 +405,13 @@ export function useAria2() {
     stoppedTasks,
     globalOptions,
     events,
+    selectedGid,
+    taskPeers,
+    taskServers,
+    speedHistory,
+    setSelectedGid,
     addUri,
+    addTorrent,
     pauseTask,
     resumeTask,
     removeTask,

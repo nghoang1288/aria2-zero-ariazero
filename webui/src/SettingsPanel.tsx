@@ -9,6 +9,7 @@ import {
   Wrench,
   Folder,
   AlertCircle,
+  Clock,
 } from 'lucide-react';
 
 // ---------------------------------------------------------------------------
@@ -522,6 +523,9 @@ export default function SettingsPanel({
       {/* Connection info */}
       <ConnectionSection connectionStatus={connectionStatus} />
 
+      {/* Scheduler section */}
+      <SchedulerSection />
+
       {/* Option sections */}
       {SECTIONS.map((section) => (
         <SettingsSection
@@ -534,3 +538,175 @@ export default function SettingsPanel({
     </div>
   );
 }
+
+// ---------------------------------------------------------------------------
+// Scheduler Section Component
+// ---------------------------------------------------------------------------
+
+function SchedulerSection() {
+  const [expanded, setExpanded] = useState(true);
+  const [enabled, setEnabled] = useState(() => localStorage.getItem('ariazero_scheduler_enabled') === 'true');
+  const [start, setStart] = useState(() => localStorage.getItem('ariazero_scheduler_start') || '08:00');
+  const [end, setEnd] = useState(() => localStorage.getItem('ariazero_scheduler_end') || '18:00');
+  const [dlLimit, setDlLimit] = useState(() => localStorage.getItem('ariazero_scheduler_dl_limit') || '500K');
+  const [ulLimit, setUlLimit] = useState(() => localStorage.getItem('ariazero_scheduler_ul_limit') || '50K');
+  const [dlNormal, setDlNormal] = useState(() => localStorage.getItem('ariazero_scheduler_dl_normal') || '0');
+  const [ulNormal, setUlNormal] = useState(() => localStorage.getItem('ariazero_scheduler_ul_normal') || '0');
+
+  const update = (key: string, value: string) => {
+    localStorage.setItem(key, value);
+    window.dispatchEvent(new Event('ariazero_scheduler_changed'));
+  };
+
+  return (
+    <div className="bg-[#151926] border border-[#1e293b] rounded-xl overflow-hidden mb-6">
+      {/* Header */}
+      <button
+        type="button"
+        onClick={() => setExpanded((p) => !p)}
+        className="w-full flex items-center justify-between px-5 py-4 text-left group hover:bg-slate-800/20 transition-colors"
+      >
+        <div className="flex items-center gap-2.5">
+          <div className="bg-cyan-500/10 p-1.5 rounded-lg border border-cyan-500/20 text-cyan-400">
+            <Clock className="w-4 h-4" />
+          </div>
+          <h2 className="text-sm font-semibold text-slate-200">Bandwidth Scheduler</h2>
+          <span className="text-[10px] text-slate-600 font-mono">
+            (Client-side profiles)
+          </span>
+        </div>
+        <ChevronDown
+          className={`w-4 h-4 text-slate-500 transition-transform duration-200 ${expanded ? 'rotate-0' : '-rotate-90'}`}
+        />
+      </button>
+
+      {/* Body */}
+      {expanded && (
+        <div className="border-t border-[#1e293b] divide-y divide-[#1e293b]">
+          {/* Toggle Enabled */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-5 py-3.5 hover:bg-slate-800/10 transition-colors">
+            <div className="sm:max-w-[55%]">
+              <span className="text-xs font-semibold text-slate-200 block">Enable Scheduler</span>
+              <span className="text-[10px] text-slate-500">Enable automatic client-side speed limit switching</span>
+            </div>
+            <div>
+              <ToggleSwitch
+                checked={enabled}
+                onChange={(val) => {
+                  setEnabled(val);
+                  update('ariazero_scheduler_enabled', String(val));
+                }}
+              />
+            </div>
+          </div>
+
+          {/* Time range */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-5 py-3.5 hover:bg-slate-800/10 transition-colors">
+            <div className="sm:max-w-[55%]">
+              <span className="text-xs font-semibold text-slate-200 block">Scheduler Limit Period</span>
+              <span className="text-[10px] text-slate-500 font-mono">Start and End time for limits</span>
+            </div>
+            <div className="flex items-center gap-2 w-full sm:w-56">
+              <input
+                type="time"
+                value={start}
+                onChange={(e) => {
+                  setStart(e.target.value);
+                  update('ariazero_scheduler_start', e.target.value);
+                }}
+                className="w-1/2 bg-[#0e111b] border border-[#1e293b] rounded-lg px-2 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-cyan-500/70"
+              />
+              <span className="text-slate-500 text-xs">to</span>
+              <input
+                type="time"
+                value={end}
+                onChange={(e) => {
+                  setEnd(e.target.value);
+                  update('ariazero_scheduler_end', e.target.value);
+                }}
+                className="w-1/2 bg-[#0e111b] border border-[#1e293b] rounded-lg px-2 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-cyan-500/70"
+              />
+            </div>
+          </div>
+
+          {/* Download limit */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-5 py-3.5 hover:bg-slate-800/10 transition-colors">
+            <div className="sm:max-w-[55%]">
+              <span className="text-xs font-semibold text-slate-200 block">Download Speed Limit</span>
+              <span className="text-[10px] text-slate-500 font-mono">e.g., 500K, 2M, 0 for unlimited</span>
+            </div>
+            <div className="w-full sm:w-56">
+              <input
+                type="text"
+                value={dlLimit}
+                onChange={(e) => {
+                  setDlLimit(e.target.value);
+                  update('ariazero_scheduler_dl_limit', e.target.value);
+                }}
+                className="w-full bg-[#0e111b] border border-[#1e293b] rounded-lg px-3 py-2 text-xs text-slate-300 focus:outline-none focus:border-cyan-500/70"
+              />
+            </div>
+          </div>
+
+          {/* Upload limit */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-5 py-3.5 hover:bg-slate-800/10 transition-colors">
+            <div className="sm:max-w-[55%]">
+              <span className="text-xs font-semibold text-slate-200 block">Upload Speed Limit</span>
+              <span className="text-[10px] text-slate-500 font-mono">e.g., 50K, 100K, 0 for unlimited</span>
+            </div>
+            <div className="w-full sm:w-56">
+              <input
+                type="text"
+                value={ulLimit}
+                onChange={(e) => {
+                  setUlLimit(e.target.value);
+                  update('ariazero_scheduler_ul_limit', e.target.value);
+                }}
+                className="w-full bg-[#0e111b] border border-[#1e293b] rounded-lg px-3 py-2 text-xs text-slate-300 focus:outline-none focus:border-cyan-500/70"
+              />
+            </div>
+          </div>
+
+          {/* Normal Download Limit */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-5 py-3.5 hover:bg-slate-800/10 transition-colors">
+            <div className="sm:max-w-[55%]">
+              <span className="text-xs font-semibold text-slate-200 block">Normal Download Limit</span>
+              <span className="text-[10px] text-slate-500 font-mono">Limit outside the scheduled hours</span>
+            </div>
+            <div className="w-full sm:w-56">
+              <input
+                type="text"
+                value={dlNormal}
+                onChange={(e) => {
+                  setDlNormal(e.target.value);
+                  update('ariazero_scheduler_dl_normal', e.target.value);
+                }}
+                className="w-full bg-[#0e111b] border border-[#1e293b] rounded-lg px-3 py-2 text-xs text-slate-300 focus:outline-none focus:border-cyan-500/70"
+              />
+            </div>
+          </div>
+
+          {/* Normal Upload Limit */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-5 py-3.5 hover:bg-slate-800/10 transition-colors">
+            <div className="sm:max-w-[55%]">
+              <span className="text-xs font-semibold text-slate-200 block">Normal Upload Limit</span>
+              <span className="text-[10px] text-slate-500 font-mono">Limit outside the scheduled hours</span>
+            </div>
+            <div className="w-full sm:w-56">
+              <input
+                type="text"
+                value={ulNormal}
+                onChange={(e) => {
+                  setUlNormal(e.target.value);
+                  update('ariazero_scheduler_ul_normal', e.target.value);
+                }}
+                className="w-full bg-[#0e111b] border border-[#1e293b] rounded-lg px-3 py-2 text-xs text-slate-300 focus:outline-none focus:border-cyan-500/70"
+              />
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
