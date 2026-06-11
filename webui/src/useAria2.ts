@@ -99,6 +99,15 @@ function getRpcSecret(): string {
   return window.AriaZeroServerConfig?.rpcSecret || '';
 }
 
+const getApiUrl = (path: string): string => {
+  if (location.port === '5173') {
+    return `http://192.168.50.226:16980/api/${path}`;
+  }
+  const protocol = location.protocol === 'https:' ? 'https' : 'http';
+  const port = location.port ? `:${location.port}` : '';
+  return `${protocol}://${location.hostname}${port}/api/${path}`;
+};
+
 export interface Aria2Event {
   id: string;
   type: 'complete' | 'error' | 'start' | 'pause' | 'stop';
@@ -120,6 +129,77 @@ export function useAria2() {
   const [stoppedTasks, setStoppedTasks] = useState<Aria2Task[]>([]);
   const [globalOptions, setGlobalOptions] = useState<Record<string, string>>({});
   const [events, setEvents] = useState<Aria2Event[]>([]);
+
+  const fetchHistory = useCallback(async () => {
+    try {
+      const secret = getRpcSecret();
+      const headers: Record<string, string> = {};
+      if (secret) {
+        headers['Authorization'] = `Bearer ${secret}`;
+      }
+      const res = await fetch(getApiUrl('history'), { headers });
+      if (res.ok) {
+        const data = await res.json();
+        setStoppedTasks(data || []);
+        return data;
+      } else {
+        console.error('Failed to fetch history:', res.statusText);
+      }
+    } catch (err) {
+      console.error('Error fetching history:', err);
+    }
+  }, []);
+
+  const deleteHistoryTask = useCallback(async (gid: string) => {
+    try {
+      const secret = getRpcSecret();
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json'
+      };
+      if (secret) {
+        headers['Authorization'] = `Bearer ${secret}`;
+      }
+      const res = await fetch(getApiUrl('history/delete'), {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ gid })
+      });
+      if (res.ok) {
+        await fetchHistory();
+      } else {
+        console.error('Failed to delete history task:', res.statusText);
+      }
+    } catch (err) {
+      console.error('Error deleting history task:', err);
+    }
+  }, [fetchHistory]);
+
+  const clearHistoryTasks = useCallback(async () => {
+    try {
+      const secret = getRpcSecret();
+      const headers: Record<string, string> = {};
+      if (secret) {
+        headers['Authorization'] = `Bearer ${secret}`;
+      }
+      const res = await fetch(getApiUrl('history/clear'), {
+        method: 'POST',
+        headers
+      });
+      if (res.ok) {
+        await fetchHistory();
+      } else {
+        console.error('Failed to clear history tasks:', res.statusText);
+      }
+    } catch (err) {
+      console.error('Error clearing history tasks:', err);
+    }
+  }, [fetchHistory]);
+
+  useEffect(() => {
+    fetchHistory();
+    const timer = setInterval(fetchHistory, 4000);
+    return () => clearInterval(timer);
+  }, [fetchHistory]);
 
   // Task details and speed history states
   const [selectedGid, setSelectedGid] = useState<string | null>(null);
@@ -211,7 +291,7 @@ export function useAria2() {
     } else if (id === 'waiting') {
       setWaitingTasks(result || []);
     } else if (id === 'stopped') {
-      setStoppedTasks(result || []);
+      // Handled by persistent history API
     } else if (id === 'getGlobalOption') {
       setGlobalOptions(result || {});
     } else if (id === 'getPeers') {
@@ -383,8 +463,7 @@ export function useAria2() {
       const reqs: { method: string; id: string; params?: any[] }[] = [
         { method: 'aria2.getGlobalStat', id: 'globalStat' },
         { method: 'aria2.tellActive', id: 'active' },
-        { method: 'aria2.tellWaiting', params: [0, 1000], id: 'waiting' },
-        { method: 'aria2.tellStopped', params: [0, 1000], id: 'stopped' }
+        { method: 'aria2.tellWaiting', params: [0, 1000], id: 'waiting' }
       ];
       if (selectedGidRef.current) {
         reqs.push({ method: 'aria2.getPeers', params: [selectedGidRef.current], id: 'getPeers' });
@@ -523,11 +602,12 @@ export function useAria2() {
 
   const clearStopped = useCallback(() => {
     const id = `action_purge_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+    clearHistoryTasks();
     return new Promise<any>((resolve, reject) => {
       pendingRequestsRef.current.set(id, { resolve, reject });
       sendRpcRef.current('aria2.purgeDownloadResult', [], id);
     });
-  }, []);
+  }, [clearHistoryTasks]);
 
   const handleAria2Notification = useCallback((msg: any) => {
     const method = msg.method as string;
@@ -552,8 +632,11 @@ export function useAria2() {
         timestamp: Date.now(),
       };
       setEvents(prev => [...prev, event]);
+      if (eventType === 'complete' || eventType === 'error' || eventType === 'stop') {
+        fetchHistory();
+      }
     }
-  }, []);
+  }, [fetchHistory]);
 
   const acknowledgeEvent = useCallback((eventId: string) => {
     setEvents(prev => prev.filter(e => e.id !== eventId));
@@ -589,6 +672,9 @@ export function useAria2() {
     changeTaskOption,
     getTaskOptions,
     acknowledgeEvent,
-    clearEvents
+    clearEvents,
+    fetchHistory,
+    deleteHistoryTask,
+    clearHistoryTasks
   };
 }

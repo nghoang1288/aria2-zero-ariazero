@@ -3,3 +3,5 @@ setup_repo.ps1
 .idea/
 .vscode/
 *.zip
+*.db
+__pycache__/

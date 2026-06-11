@@ -74,7 +74,9 @@ function App() {
     updateGlobalOptions,
     changeTaskOption,
     getTaskOptions,
-    acknowledgeEvent
+    acknowledgeEvent,
+    deleteHistoryTask,
+    clearHistoryTasks
   } = useAria2();
 
   const { showToast } = useToast();
@@ -326,6 +328,8 @@ function App() {
         getTaskOptions={getTaskOptions}
         events={events}
         acknowledgeEvent={acknowledgeEvent}
+        deleteHistoryTask={deleteHistoryTask}
+        clearHistoryTasks={clearHistoryTasks}
       />
     </SmartDownloadProvider>
   );
@@ -374,6 +378,8 @@ interface AppContentProps {
   getTaskOptions: (gid: string) => Promise<any>;
   events: any[];
   acknowledgeEvent: (id: string) => void;
+  deleteHistoryTask: (gid: string) => Promise<any>;
+  clearHistoryTasks: () => Promise<any>;
 }
 
 function playNotificationBeep() {
@@ -414,6 +420,7 @@ function AppContent({
   modalInitialUris, modalInitialMode, setModalInitialUris, setModalInitialMode,
   connect, reconnectCountdown, changeTaskOption, getTaskOptions,
   events, acknowledgeEvent,
+  deleteHistoryTask, clearHistoryTasks,
 }: AppContentProps) {
   const { isDragging } = useSmartDownload();
   const [showMobileSidebar, setShowMobileSidebar] = useState(false);
@@ -536,6 +543,9 @@ function AppContent({
       });
     } finally {
       removeTask(taskToRemove.gid, taskToRemove.status);
+      if (taskToRemove.status === 'complete' || taskToRemove.status === 'error' || taskToRemove.status === 'removed') {
+        await deleteHistoryTask(taskToRemove.gid);
+      }
       setTaskToRemove(null);
       setIsDeletingFiles(false);
       setTimeout(fetchDiskSpace, 1000);
@@ -581,6 +591,7 @@ function AppContent({
       console.error('Error clearing all files:', e);
     } finally {
       clearStopped();
+      await clearHistoryTasks();
       setShowClearAllConfirm(false);
       setIsClearingAll(false);
       setTimeout(fetchDiskSpace, 1000);
@@ -610,6 +621,9 @@ function AppContent({
 
       addUri(url);
       removeTask(task.gid, task.status);
+      if (task.status === 'complete' || task.status === 'error' || task.status === 'removed') {
+        await deleteHistoryTask(task.gid);
+      }
       showToast({
         type: 'success',
         title: 'Retrying Download',
@@ -1026,6 +1040,15 @@ function AppContent({
               activeTasks={activeTasks}
               waitingTasks={waitingTasks}
               stoppedTasks={stoppedTasks}
+              speedHistory={speedHistory}
+            />
+          )}
+
+          {activeTab === 'downloads' && (
+            <DownloadsPage
+              activeTasks={activeTasks}
+              waitingTasks={waitingTasks}
+              stoppedTasks={stoppedTasks}
               searchQuery={searchQuery}
               selectedCategory={selectedCategory}
               pauseTask={pauseTask}
@@ -1036,21 +1059,6 @@ function AppContent({
               retryTask={retryTask}
               setShowClearAllConfirm={setShowClearAllConfirm}
               setDeleteClearAllFiles={setDeleteClearAllFiles}
-              speedHistory={speedHistory}
-            />
-          )}
-
-          {activeTab === 'downloads' && (
-            <DownloadsPage
-              activeTasks={activeTasks}
-              waitingTasks={waitingTasks}
-              searchQuery={searchQuery}
-              selectedCategory={selectedCategory}
-              pauseTask={pauseTask}
-              resumeTask={resumeTask}
-              handleInitiateRemove={handleInitiateRemove}
-              setSelectedGid={setSelectedGid}
-              selectedGid={selectedGid}
             />
           )}
 

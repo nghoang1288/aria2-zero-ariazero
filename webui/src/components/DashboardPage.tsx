@@ -1,30 +1,16 @@
 import { useMemo, useState } from 'react';
-import { ArrowDown, ArrowUp, CheckCircle, Clock, AlertCircle, Trash2, Pause, Play, Check } from 'lucide-react';
-import { formatBytes, formatSpeed } from '../useAria2';
+import { ArrowDown, CheckCircle, Clock } from 'lucide-react';
+import { formatSpeed } from '../useAria2';
 import type { Aria2Task } from '../useAria2';
 import { 
   isTorrentCompleted, 
-  isTaskSeeding, 
-  getTaskName, 
-  isMetadataTask, 
-  filterTaskByCategory 
+  isMetadataTask 
 } from '../utils/taskUtils';
-import TaskCard from './TaskCard';
 
 interface DashboardPageProps {
   activeTasks: Aria2Task[];
   waitingTasks: Aria2Task[];
   stoppedTasks: Aria2Task[];
-  searchQuery: string;
-  selectedCategory: string;
-  pauseTask: (gid: string) => void;
-  resumeTask: (gid: string) => void;
-  handleInitiateRemove: (task: Aria2Task) => void;
-  setSelectedGid: (gid: string | null) => void;
-  selectedGid: string | null;
-  retryTask: (task: Aria2Task) => void;
-  setShowClearAllConfirm: (show: boolean) => void;
-  setDeleteClearAllFiles: (del: boolean) => void;
   speedHistory?: { down: number[]; up: number[] };
 }
 
@@ -32,32 +18,10 @@ export default function DashboardPage({
   activeTasks,
   waitingTasks,
   stoppedTasks,
-  searchQuery,
-  selectedCategory,
-  pauseTask,
-  resumeTask,
-  handleInitiateRemove,
-  setSelectedGid,
-  selectedGid,
-  retryTask,
-  setShowClearAllConfirm,
-  setDeleteClearAllFiles,
   speedHistory,
 }: DashboardPageProps) {
 
-  const lowercaseQuery = useMemo(() => searchQuery.toLowerCase().trim(), [searchQuery]);
-
   const allActiveAndWaiting = useMemo(() => [...activeTasks, ...waitingTasks], [activeTasks, waitingTasks]);
-
-  const displayDownloads = useMemo(() => {
-    if (!lowercaseQuery) return allActiveAndWaiting;
-    return allActiveAndWaiting.filter(t => getTaskName(t).toLowerCase().includes(lowercaseQuery));
-  }, [allActiveAndWaiting, lowercaseQuery]);
-
-  const displayStopped = useMemo(() => {
-    if (!lowercaseQuery) return stoppedTasks;
-    return stoppedTasks.filter(t => getTaskName(t).toLowerCase().includes(lowercaseQuery));
-  }, [stoppedTasks, lowercaseQuery]);
 
   const activeCount = useMemo(() => {
     return allActiveAndWaiting.filter((t: Aria2Task) => t.status === 'active' && !isTorrentCompleted(t) && !isMetadataTask(t)).length;
@@ -72,24 +36,6 @@ export default function DashboardPage({
   const queuePausedCount = useMemo(() => {
     return allActiveAndWaiting.filter((t: Aria2Task) => (t.status === 'paused' || t.status === 'waiting') && !isTorrentCompleted(t) && !isMetadataTask(t)).length;
   }, [allActiveAndWaiting]);
-
-  const downloads = useMemo(() => {
-    return displayDownloads.filter((t: Aria2Task) => !isTorrentCompleted(t) && !isMetadataTask(t));
-  }, [displayDownloads]);
-
-  const completedAndStopped = useMemo(() => {
-    const stoppedClean = displayStopped.filter((t: Aria2Task) => !isMetadataTask(t));
-    const downloadsTorrentComplete = displayDownloads.filter((t: Aria2Task) => isTorrentCompleted(t) && !isMetadataTask(t));
-    return [...stoppedClean, ...downloadsTorrentComplete];
-  }, [displayStopped, displayDownloads]);
-
-  const filteredDownloads = useMemo(() => {
-    return downloads.filter(t => filterTaskByCategory(t, selectedCategory));
-  }, [downloads, selectedCategory]);
-
-  const filteredStopped = useMemo(() => {
-    return completedAndStopped.filter(t => filterTaskByCategory(t, selectedCategory));
-  }, [completedAndStopped, selectedCategory]);
 
   return (
     <>
@@ -128,160 +74,6 @@ export default function DashboardPage({
 
       {/* Large SVG Speed Chart */}
       <SpeedChart speedHistory={speedHistory} />
-
-      {/* Downloads list inside Dashboard */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold tracking-wider uppercase text-text-dim">Active Downloads</h2>
-        </div>
-        {filteredDownloads.length === 0 ? (
-          <div className="bg-card-bg border border-border-main border-dashed rounded-xl p-10 text-center text-text-dim text-xs">
-            No matching active or waiting download tasks.
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {filteredDownloads.map((task: Aria2Task) => (
-              <TaskCard 
-                key={task.gid} 
-                task={task} 
-                onPause={pauseTask} 
-                onResume={resumeTask} 
-                onRemove={handleInitiateRemove}
-                onSelect={setSelectedGid}
-                isSelected={selectedGid === task.gid}
-              />
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Recent Completions */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between border-b border-border-main pb-2">
-          <h2 className="text-sm font-semibold tracking-wider uppercase text-text-dim">Recent Completions</h2>
-          {filteredStopped.length > 0 && (
-            <button 
-              onClick={() => {
-                setShowClearAllConfirm(true);
-                setDeleteClearAllFiles(false);
-              }}
-              className="text-xs text-text-dim hover:text-text-main flex items-center gap-1 transition-colors cursor-pointer"
-            >
-              Clear stopped tasks
-            </button>
-          )}
-        </div>
-        {filteredStopped.length === 0 ? (
-          <div className="bg-card-bg border border-border-main border-dashed rounded-xl p-10 text-center text-text-dim text-xs">
-            No matching completed or stopped tasks in history.
-          </div>
-        ) : (
-          <div className="bg-card-bg border border-border-main rounded-xl overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse min-w-[550px] md:min-w-0">
-                <thead>
-                  <tr className="border-b border-border-main bg-page-bg/40 text-text-dim text-[10px] uppercase font-bold tracking-wider">
-                    <th className="py-3 px-5">File Name</th>
-                    <th className="py-3 px-5 w-32">File Size</th>
-                    <th className="py-3 px-5 w-32">Status</th>
-                    <th className="py-3 px-5 w-24 text-right">Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredStopped.map((task: Aria2Task) => {
-                    const isError = task.status === 'error';
-                    const isSeeding = isTaskSeeding(task);
-                    return (
-                      <tr 
-                        key={task.gid} 
-                        onClick={(e) => {
-                          if ((e.target as HTMLElement).closest('button')) return;
-                          setSelectedGid(task.gid);
-                        }}
-                        className={`border-b border-border-main hover:bg-page-bg/25 text-xs text-text-main cursor-pointer transition-colors ${
-                          selectedGid === task.gid ? 'bg-cyan-500/5' : ''
-                        }`}
-                      >
-                        <td className="py-3 px-5 font-medium max-w-md truncate" title={getTaskName(task)}>
-                          {getTaskName(task)}
-                        </td>
-                        <td className="py-3 px-5 text-text-dim">{formatBytes(task.totalLength)}</td>
-                        <td className="py-3 px-5 relative group/status">
-                          {isError ? (
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-rose-400 flex items-center gap-1.5 font-medium cursor-help">
-                                <AlertCircle className="w-3.5 h-3.5" />
-                                Error
-                              </span>
-                              <button 
-                                onClick={() => retryTask(task)}
-                                className="px-1.5 py-0.5 text-[9px] bg-cyan-500/15 text-cyan-400 border border-cyan-500/30 rounded-md hover:bg-cyan-500 hover:text-white transition-all cursor-pointer font-medium"
-                                title="Retry download"
-                              >
-                                Retry
-                              </button>
-                              
-                              {/* Tooltip */}
-                              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover/status:block z-50 bg-slate-900 border border-slate-700 text-slate-100 text-[10px] p-2.5 rounded-lg shadow-xl max-w-xs w-64 pointer-events-none break-words font-mono text-left leading-relaxed">
-                                <div className="text-rose-400 font-semibold mb-1">Aria2 Error (Code {task.errorCode || 'Unknown'}):</div>
-                                <div>{task.errorMessage || 'No detailed error message available.'}</div>
-                                <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-900" />
-                              </div>
-                            </div>
-                          ) : isSeeding ? (
-                            <span className="text-emerald-400 flex items-center gap-1.5 font-medium animate-pulse">
-                              <ArrowUp className="w-3.5 h-3.5" />
-                              Seeding ({formatSpeed(task.uploadSpeed)})
-                            </span>
-                          ) : isTorrentCompleted(task) && (task.status === 'paused' || task.status === 'waiting') ? (
-                            <span className="text-amber-400 flex items-center gap-1.5 font-medium">
-                              <Pause className="w-3.5 h-3.5" />
-                              Seeding Paused
-                            </span>
-                          ) : (
-                            <span className="text-emerald-400 flex items-center gap-1.5 font-medium">
-                              <Check className="w-3.5 h-3.5" />
-                              Completed
-                            </span>
-                          )}
-                        </td>
-                        <td className="py-3 px-5 text-right flex items-center justify-end gap-1.5">
-                          {isTorrentCompleted(task) && task.status !== 'complete' && (
-                            task.status === 'active' ? (
-                              <button 
-                                onClick={() => pauseTask(task.gid)}
-                                className="text-text-dim hover:text-cyan-400 p-1.5 rounded transition-colors cursor-pointer"
-                                title="Pause Seeding"
-                              >
-                                <Pause className="w-4 h-4" />
-                              </button>
-                            ) : (
-                              <button 
-                                onClick={() => resumeTask(task.gid)}
-                                className="text-text-dim hover:text-emerald-400 p-1.5 rounded transition-colors cursor-pointer"
-                                title="Resume Seeding"
-                              >
-                                <Play className="w-4 h-4" />
-                              </button>
-                            )
-                          )}
-                          <button 
-                            onClick={() => handleInitiateRemove(task)}
-                            className="text-text-dim hover:text-rose-400 p-1.5 rounded transition-colors cursor-pointer"
-                            title="Delete task from history"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-      </div>
     </>
   );
 }
