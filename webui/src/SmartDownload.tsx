@@ -6,7 +6,7 @@ import { useState, useEffect, useCallback, useRef, createContext, useContext } f
 
 interface SmartDownloadProps {
   children: React.ReactNode;
-  onLinkDetected: (url: string) => void;
+  onLinkDetected: (url: string, source?: 'url_param' | 'clipboard' | 'drag') => void;
   onTorrentDetected?: (base64: string, filename: string) => void;
 }
 
@@ -68,23 +68,23 @@ export function SmartDownloadProvider({
   // -----------------------------------------------------------------------
   // Helper: emit a detected URL (deduplicates against the last one)
   // -----------------------------------------------------------------------
-  const emitUrl = useCallback((url: string) => {
+  const emitUrl = useCallback((url: string, source?: 'url_param' | 'clipboard' | 'drag') => {
     const trimmed = url.trim();
     if (!trimmed || trimmed === lastDetectedRef.current) return;
     lastDetectedRef.current = trimmed;
-    onLinkDetectedRef.current(trimmed);
+    onLinkDetectedRef.current(trimmed, source);
   }, []);
 
   // -----------------------------------------------------------------------
   // Helper: read clipboard and emit any detected URL
   // -----------------------------------------------------------------------
-  const readClipboardAndEmit = useCallback(async () => {
+  const readClipboardAndEmit = useCallback(async (source: 'clipboard' = 'clipboard') => {
     try {
       const text = await navigator.clipboard.readText();
       if (text) {
         const urls = extractUrls(text);
         if (urls.length > 0) {
-          emitUrl(urls[0]);
+          emitUrl(urls[0], source);
         }
       }
     } catch {
@@ -97,7 +97,7 @@ export function SmartDownloadProvider({
   // -----------------------------------------------------------------------
   useEffect(() => {
     const handleFocus = () => {
-      readClipboardAndEmit();
+      readClipboardAndEmit('clipboard');
     };
 
     window.addEventListener('focus', handleFocus);
@@ -123,7 +123,7 @@ export function SmartDownloadProvider({
     const uri = params.get('uri');
     if (uri) {
       const decoded = decodeURIComponent(uri);
-      emitUrl(decoded);
+      emitUrl(decoded, 'url_param');
       // Clean the URL so the parameter is not re-processed on refresh.
       window.history.replaceState(null, '', window.location.pathname);
     }
@@ -190,7 +190,7 @@ export function SmartDownloadProvider({
 
       const urls = extractUrls(raw);
       for (const url of urls) {
-        emitUrl(url);
+        emitUrl(url, 'drag');
       }
     };
 
@@ -216,7 +216,7 @@ export function SmartDownloadProvider({
       const isMod = e.ctrlKey || e.metaKey;
 
       if (isV && isMod && !isInputElement(e.target)) {
-        readClipboardAndEmit();
+        readClipboardAndEmit('clipboard');
       }
     };
 

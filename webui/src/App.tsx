@@ -72,6 +72,8 @@ function App() {
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
     return (localStorage.getItem('ariazero_theme') as 'dark' | 'light') || 'dark';
   });
+  const [addMode, setAddMode] = useState<'link' | 'torrent'>('link');
+  const [torrentFile, setTorrentFile] = useState<{ name: string; base64: string } | null>(null);
 
   const toggleTheme = () => {
     const next = theme === 'dark' ? 'light' : 'dark';
@@ -82,24 +84,36 @@ function App() {
 
 
   // Smart download handler: when a link is detected from clipboard/magnet/drag
-  const handleLinkDetected = useCallback((url: string) => {
-    showToast({
-      type: 'info',
-      title: 'Link Detected',
-      message: url.length > 60 ? url.slice(0, 60) + '…' : url,
-      action: {
-        label: 'Download Now',
-        onClick: () => {
-          addUri(url);
-          showToast({
-            type: 'success',
-            title: 'Download Started',
-            message: 'Task added to queue',
-          });
+  const handleLinkDetected = useCallback((url: string, source?: 'url_param' | 'clipboard' | 'drag') => {
+    if (source === 'url_param') {
+      setNewUris(url);
+      setAddMode('link');
+      setShowAddModal(true);
+      showToast({
+        type: 'info',
+        title: 'Magnet Link Detected',
+        message: 'Opened download popup',
+        duration: 3000,
+      });
+    } else {
+      showToast({
+        type: 'info',
+        title: 'Link Detected',
+        message: url.length > 60 ? url.slice(0, 60) + '…' : url,
+        action: {
+          label: 'Download Now',
+          onClick: () => {
+            addUri(url);
+            showToast({
+              type: 'success',
+              title: 'Download Started',
+              message: 'Task added to queue',
+            });
+          },
         },
-      },
-      duration: 8000,
-    });
+        duration: 8000,
+      });
+    }
   }, [addUri, showToast]);
 
   const handleTorrentDetected = useCallback((base64: string, filename: string) => {
@@ -285,6 +299,10 @@ function App() {
         toggleTheme={toggleTheme}
         selectedCategory={selectedCategory}
         setSelectedCategory={setSelectedCategory}
+        addMode={addMode}
+        setAddMode={setAddMode}
+        torrentFile={torrentFile}
+        setTorrentFile={setTorrentFile}
       />
     </SmartDownloadProvider>
   );
@@ -300,11 +318,10 @@ function AppContent({
   fetchGlobalOptions, updateGlobalOptions, addUri, addTorrent,
   selectedGid, taskPeers, taskServers, speedHistory, setSelectedGid,
   theme, toggleTheme, selectedCategory, setSelectedCategory,
+  addMode, setAddMode, torrentFile, setTorrentFile,
 }: any) {
   const { isDragging } = useSmartDownload();
   const [drawerTab, setDrawerTab] = useState<'files' | 'peers' | 'trackers'>('files');
-  const [addMode, setAddMode] = useState<'link' | 'torrent'>('link');
-  const [torrentFile, setTorrentFile] = useState<{ name: string; base64: string } | null>(null);
 
   // Helper category detection
   const getFileExtension = (task: Aria2Task): string => {
