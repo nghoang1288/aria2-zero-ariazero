@@ -574,6 +574,13 @@ function AppContent({
       Number(task.completedLength) >= Number(task.totalLength);
   };
 
+  // A torrent is completed (can be seeding or seeding-paused/complete)
+  const isTorrentCompleted = (task: Aria2Task) => {
+    return !!task.bittorrent && 
+      Number(task.totalLength) > 0 && 
+      Number(task.completedLength) >= Number(task.totalLength);
+  };
+
   // Identify completed metadata tasks to hide them
   const isMetadataTask = (task: Aria2Task) => {
     const name = getTaskName(task).toLowerCase();
@@ -584,8 +591,9 @@ function AppContent({
   };
 
   const allTasks = [...allActiveAndWaiting, ...stoppedTasks].filter((t: Aria2Task) => !isMetadataTask(t));
-  const activeCount = allActiveAndWaiting.filter((t: Aria2Task) => t.status === 'active' && !isTaskSeeding(t) && !isMetadataTask(t)).length;
-  const completedCount = stoppedTasks.filter((t: Aria2Task) => t.status === 'complete' && !isMetadataTask(t)).length + allActiveAndWaiting.filter((t: Aria2Task) => isTaskSeeding(t) && !isMetadataTask(t)).length;
+  const activeCount = allActiveAndWaiting.filter((t: Aria2Task) => t.status === 'active' && !isTorrentCompleted(t) && !isMetadataTask(t)).length;
+  const downloadsCount = allActiveAndWaiting.filter((t: Aria2Task) => !isTorrentCompleted(t) && !isMetadataTask(t)).length;
+  const completedCount = stoppedTasks.filter((t: Aria2Task) => t.status === 'complete' && !isMetadataTask(t)).length + allActiveAndWaiting.filter((t: Aria2Task) => isTorrentCompleted(t) && !isMetadataTask(t)).length;
   const torrentCount = allTasks.filter(isTorrent).length;
   const videoCount = allTasks.filter(isVideo).length;
   const audioCount = allTasks.filter(isAudio).length;
@@ -606,9 +614,9 @@ function AppContent({
   const filterTaskByCategory = (task: Aria2Task) => {
     switch (selectedCategory) {
       case 'active':
-        return (task.status === 'active' || task.status === 'waiting') && !isTaskSeeding(task) && !isMetadataTask(task);
+        return (task.status === 'active' || task.status === 'waiting') && !isTorrentCompleted(task) && !isMetadataTask(task);
       case 'completed':
-        return (task.status === 'complete' || isTaskSeeding(task)) && !isMetadataTask(task);
+        return (task.status === 'complete' || isTorrentCompleted(task)) && !isMetadataTask(task);
       case 'torrents':
         return isTorrent(task) && !isMetadataTask(task);
       case 'video':
@@ -625,10 +633,10 @@ function AppContent({
     }
   };
 
-  const downloads = displayDownloads.filter((t: Aria2Task) => !isTaskSeeding(t) && !isMetadataTask(t));
+  const downloads = displayDownloads.filter((t: Aria2Task) => !isTorrentCompleted(t) && !isMetadataTask(t));
   const completedAndStopped = [
     ...displayStopped.filter((t: Aria2Task) => !isMetadataTask(t)), 
-    ...displayDownloads.filter((t: Aria2Task) => isTaskSeeding(t) && !isMetadataTask(t))
+    ...displayDownloads.filter((t: Aria2Task) => isTorrentCompleted(t) && !isMetadataTask(t))
   ];
 
   const filteredDownloads = downloads.filter(filterTaskByCategory);
@@ -688,9 +696,9 @@ function AppContent({
           >
             <ArrowDown className="w-4 h-4" />
             Downloads
-            {allActiveAndWaiting.length > 0 && (
+            {downloadsCount > 0 && (
               <span className="ml-auto bg-cyan-500/15 text-cyan-400 border border-cyan-500/20 text-xs px-2 py-0.5 rounded-full">
-                {allActiveAndWaiting.length}
+                {downloadsCount}
               </span>
             )}
           </button>
@@ -925,7 +933,7 @@ function AppContent({
                 <div className="bg-card-bg border border-border-main rounded-xl p-5 flex items-center justify-between">
                   <div>
                     <span className="text-xs text-text-dim font-medium block mb-1">Queue / Paused</span>
-                    <span className="text-2xl font-bold text-text-main">{allActiveAndWaiting.filter((t: Aria2Task) => (t.status === 'paused' || t.status === 'waiting') && !isMetadataTask(t)).length}</span>
+                    <span className="text-2xl font-bold text-text-main">{allActiveAndWaiting.filter((t: Aria2Task) => (t.status === 'paused' || t.status === 'waiting') && !isTorrentCompleted(t) && !isMetadataTask(t)).length}</span>
                   </div>
                   <div className="bg-amber-500/10 border border-amber-500/20 p-3 rounded-lg text-amber-400">
                     <Clock className="w-5 h-5" />
@@ -1037,6 +1045,11 @@ function AppContent({
                                     <ArrowUp className="w-3.5 h-3.5" />
                                     Seeding ({formatSpeed(task.uploadSpeed)})
                                   </span>
+                                ) : isTorrentCompleted(task) && (task.status === 'paused' || task.status === 'waiting') ? (
+                                  <span className="text-amber-400 flex items-center gap-1.5 font-medium">
+                                    <Pause className="w-3.5 h-3.5" />
+                                    Seeding Paused
+                                  </span>
                                 ) : (
                                   <span className="text-emerald-400 flex items-center gap-1.5 font-medium">
                                     <Check className="w-3.5 h-3.5" />
@@ -1044,7 +1057,26 @@ function AppContent({
                                   </span>
                                 )}
                               </td>
-                              <td className="py-3 px-5 text-right">
+                              <td className="py-3 px-5 text-right flex items-center justify-end gap-1.5">
+                                {isTorrentCompleted(task) && task.status !== 'complete' && (
+                                  task.status === 'active' ? (
+                                    <button 
+                                      onClick={() => pauseTask(task.gid)}
+                                      className="text-text-dim hover:text-cyan-400 p-1.5 rounded transition-colors cursor-pointer"
+                                      title="Pause Seeding"
+                                    >
+                                      <Pause className="w-4 h-4" />
+                                    </button>
+                                  ) : (
+                                    <button 
+                                      onClick={() => resumeTask(task.gid)}
+                                      className="text-text-dim hover:text-emerald-400 p-1.5 rounded transition-colors cursor-pointer"
+                                      title="Resume Seeding"
+                                    >
+                                      <Play className="w-4 h-4" />
+                                    </button>
+                                  )
+                                )}
                                 <button 
                                   onClick={() => handleInitiateRemove(task)}
                                   className="text-text-dim hover:text-rose-400 p-1.5 rounded transition-colors cursor-pointer"
