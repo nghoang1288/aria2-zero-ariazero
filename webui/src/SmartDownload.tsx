@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, createContext, useContext } from 'react';
+import { useState, useEffect, useCallback, useRef, createContext, useContext, useMemo } from 'react';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -23,18 +23,11 @@ const SmartDownloadContext = createContext<SmartDownloadContextValue>({
 });
 
 // ---------------------------------------------------------------------------
-// URL detection regex
-// ---------------------------------------------------------------------------
-
-const DOWNLOADABLE_URL_RE =
-  /(https?:\/\/[^\s]+\.(zip|rar|7z|tar|gz|bz2|xz|iso|exe|msi|dmg|pkg|deb|rpm|apk|mp4|mkv|avi|mov|mp3|flac|wav|pdf|epub|torrent|gguf|safetensors|bin|ckpt|pth)([?#][^\s]*)?|magnet:\?xt=urn:[^\s]+)/gi;
-
-// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-function extractUrls(text: string): string[] {
-  const matches = text.match(DOWNLOADABLE_URL_RE);
+function extractUrls(text: string, regex: RegExp): string[] {
+  const matches = text.match(regex);
   return matches ? [...new Set(matches)] : [];
 }
 
@@ -56,6 +49,27 @@ export function SmartDownloadProvider({
   const [isDragging, setIsDragging] = useState(false);
   const lastDetectedRef = useRef<string>('');
   const dragCounterRef = useRef(0);
+
+  // Load extensions list dynamically
+  const [extensions, setExtensions] = useState(() => {
+    return localStorage.getItem('ariazero_custom_extensions') || 
+      'zip,rar,7z,tar,gz,bz2,xz,iso,exe,msi,dmg,pkg,deb,rpm,apk,mp4,mkv,avi,mov,mp3,flac,wav,pdf,epub,torrent,gguf,safetensors,bin,ckpt,pth';
+  });
+
+  useEffect(() => {
+    const handleUpdate = () => {
+      setExtensions(localStorage.getItem('ariazero_custom_extensions') || 
+        'zip,rar,7z,tar,gz,bz2,xz,iso,exe,msi,dmg,pkg,deb,rpm,apk,mp4,mkv,avi,mov,mp3,flac,wav,pdf,epub,torrent,gguf,safetensors,bin,ckpt,pth');
+    };
+    window.addEventListener('ariazero_extensions_changed', handleUpdate);
+    return () => window.removeEventListener('ariazero_extensions_changed', handleUpdate);
+  }, []);
+
+  const downloadRegex = useMemo(() => {
+    const extList = extensions.split(',').map(e => e.trim().toLowerCase()).filter(Boolean);
+    const escaped = extList.map(ext => ext.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
+    return new RegExp(`(https?:\\/\\/[^\\s]+\\.(${escaped})([?#][^\\s]*)?|magnet:\\?xt=urn:[^\\s]+)`, 'gi');
+  }, [extensions]);
 
   // Stable callback ref so listeners always see the latest function.
   const onLinkDetectedRef = useRef(onLinkDetected);
@@ -82,7 +96,7 @@ export function SmartDownloadProvider({
     try {
       const text = await navigator.clipboard.readText();
       if (text) {
-        const urls = extractUrls(text);
+        const urls = extractUrls(text, downloadRegex);
         if (urls.length > 0) {
           emitUrl(urls[0], source);
         }
@@ -90,7 +104,7 @@ export function SmartDownloadProvider({
     } catch {
       // Clipboard read requires permission and may fail silently.
     }
-  }, [emitUrl]);
+  }, [emitUrl, downloadRegex]);
 
   // -----------------------------------------------------------------------
   // 1. Clipboard Auto-Detect on window focus
@@ -188,7 +202,7 @@ export function SmartDownloadProvider({
       const plainText = e.dataTransfer?.getData('text/plain');
       const raw = uriList || plainText || '';
 
-      const urls = extractUrls(raw);
+      const urls = extractUrls(raw, downloadRegex);
       for (const url of urls) {
         emitUrl(url, 'drag');
       }
@@ -205,7 +219,7 @@ export function SmartDownloadProvider({
       document.removeEventListener('dragleave', handleDragLeave);
       document.removeEventListener('drop', handleDrop);
     };
-  }, [emitUrl]);
+  }, [emitUrl, downloadRegex]);
 
   // -----------------------------------------------------------------------
   // 4. Keyboard Shortcut (Ctrl/Cmd + V outside inputs)

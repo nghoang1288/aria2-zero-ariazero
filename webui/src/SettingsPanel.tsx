@@ -526,6 +526,9 @@ export default function SettingsPanel({
       {/* Scheduler section */}
       <SchedulerSection />
 
+      {/* Smart Download Preferences */}
+      <SmartDownloadSettingsSection />
+
       {/* Option sections */}
       {SECTIONS.map((section) => (
         <SettingsSection
@@ -701,6 +704,70 @@ function SchedulerSection() {
                   update('ariazero_scheduler_ul_normal', e.target.value);
                 }}
                 className="w-full bg-[#0e111b] border border-[#1e293b] rounded-lg px-3 py-2 text-xs text-slate-300 focus:outline-none focus:border-cyan-500/70"
+              />
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Smart Download Settings Section Component
+// ---------------------------------------------------------------------------
+
+function SmartDownloadSettingsSection() {
+  const [expanded, setExpanded] = useState(true);
+  const [extensions, setExtensions] = useState(() => {
+    return localStorage.getItem('ariazero_custom_extensions') || 
+      'zip,rar,7z,tar,gz,bz2,xz,iso,exe,msi,dmg,pkg,deb,rpm,apk,mp4,mkv,avi,mov,mp3,flac,wav,pdf,epub,torrent,gguf,safetensors,bin,ckpt,pth';
+  });
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setExtensions(value);
+    localStorage.setItem('ariazero_custom_extensions', value);
+    window.dispatchEvent(new Event('ariazero_extensions_changed'));
+  };
+
+  return (
+    <div className="bg-[#151926] border border-[#1e293b] rounded-xl overflow-hidden mb-6">
+      {/* Header */}
+      <button
+        type="button"
+        onClick={() => setExpanded((p) => !p)}
+        className="w-full flex items-center justify-between px-5 py-4 text-left group hover:bg-slate-800/20 transition-colors"
+      >
+        <div className="flex items-center gap-2.5">
+          <div className="bg-cyan-500/10 p-1.5 rounded-lg border border-cyan-500/20 text-cyan-400">
+            <Globe className="w-4 h-4" />
+          </div>
+          <h2 className="text-sm font-semibold text-slate-200">Smart Download Settings</h2>
+          <span className="text-[10px] text-slate-600 font-mono">
+            (WebUI Preferences)
+          </span>
+        </div>
+        <ChevronDown
+          className={`w-4 h-4 text-slate-500 transition-transform duration-200 ${expanded ? 'rotate-0' : '-rotate-90'}`}
+        />
+      </button>
+
+      {/* Body */}
+      {expanded && (
+        <div className="border-t border-[#1e293b] divide-y divide-[#1e293b]">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-5 py-3.5 hover:bg-slate-800/10 transition-colors">
+            <div className="sm:max-w-[55%]">
+              <span className="text-xs font-semibold text-slate-200 block">Allowed File Extensions</span>
+              <span className="text-[10px] text-slate-500">Comma-separated list of extensions that trigger clipboard capture and drag-drop</span>
+            </div>
+            <div className="w-full sm:w-80">
+              <input
+                type="text"
+                value={extensions}
+                onChange={handleChange}
+                placeholder="e.g. zip,rar,mp4,gguf"
+                className="w-full bg-[#0e111b] border border-[#1e293b] rounded-lg px-3 py-2 text-xs text-slate-300 focus:outline-none focus:border-cyan-500/70 font-mono"
               />
             </div>
           </div>
