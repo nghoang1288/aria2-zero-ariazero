@@ -1,4 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
+import { getTaskName } from './utils/taskUtils';
+
+export { getTaskName };
 
 export interface Aria2File {
   path: string;
@@ -19,12 +22,17 @@ export interface Aria2Task {
     info?: {
       name?: string;
     };
+    infoHash?: string;
+    mode?: string;
+    announceList?: any[][];
   };
   connections?: string;
   numSeeders?: string;
   errorCode?: string;
   errorMessage?: string;
   infoHash?: string;
+  bitfield?: string;
+  numPieces?: string;
 }
 
 export interface Aria2GlobalStat {
@@ -33,25 +41,6 @@ export interface Aria2GlobalStat {
   numActive: string;
   numWaiting: string;
   numStopped: string;
-}
-
-export function getTaskName(task: Aria2Task): string {
-  if (task.bittorrent?.info?.name) {
-    return task.bittorrent.info.name;
-  }
-  const filePath = task.files?.[0]?.path;
-  if (filePath) {
-    const parts = filePath.split(/[/\\]/);
-    const name = parts[parts.length - 1];
-    if (name) return name;
-  }
-  const uri = task.files?.[0]?.uris?.[0]?.uri;
-  if (uri) {
-    const parts = uri.split('/');
-    const name = parts[parts.length - 1].split('?')[0];
-    if (name) return decodeURIComponent(name);
-  }
-  return 'Downloading Task...';
 }
 
 export function formatSpeed(bytesPerSec: number | string): string {
@@ -137,6 +126,7 @@ export function useAria2() {
   const [taskPeers, setTaskPeers] = useState<any[]>([]);
   const [taskServers, setTaskServers] = useState<any[]>([]);
   const [speedHistory, setSpeedHistory] = useState<{ down: number[]; up: number[] }>({ down: [], up: [] });
+  const [reconnectCountdown, setReconnectCountdown] = useState<number | null>(null);
 
   const selectedGidRef = useRef<string | null>(null);
 
@@ -150,9 +140,12 @@ export function useAria2() {
 
   const socketRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<number | null>(null);
-  const pollIntervalRef = useRef<number | null>(null);
+  const reconnectAttemptsRef = useRef(0);
+  const countdownIntervalRef = useRef<any>(null);
+  const pollTimeoutRef = useRef<any>(null);
+  const pendingRequestsRef = useRef<Map<string, { resolve: (val: any) => void; reject: (err: any) => void }>>(new Map());
 
-  // Use refs for callbacks to avoid stale closures in setInterval
+  // Use refs for callbacks to avoid stale closures in setInterval / setTimeout
   const sendRpcRef = useRef<(method: string, params: any[], id: string) => void>(() => {});
   const sendBatchRpcRef = useRef<(requests: { method: string; params?: any[]; id: string }[]) => void>(() => {});
 
@@ -187,7 +180,6 @@ export function useAria2() {
   sendRpcRef.current = sendRpc;
   sendBatchRpcRef.current = sendBatchRpc;
 
-
   const fetchGlobalOptions = useCallback(() => {
     sendRpcRef.current('aria2.getGlobalOption', [], 'getGlobalOption');
   }, []);
@@ -211,8 +203,8 @@ export function useAria2() {
       const dl = Number(result.downloadSpeed) || 0;
       const ul = Number(result.uploadSpeed) || 0;
       setSpeedHistory(prev => ({
-        down: [...prev.down, dl].slice(-30),
-        up: [...prev.up, ul].slice(-30)
+        down: [...prev.down, dl].slice(-60),
+        up: [...prev.up, ul].slice(-60)
       }));
     } else if (id === 'active') {
       setActiveTasks(result || []);
@@ -229,7 +221,6 @@ export function useAria2() {
     }
   }, []);
 
-
   const cleanup = useCallback(() => {
     if (socketRef.current) {
       socketRef.current.close();
@@ -239,10 +230,15 @@ export function useAria2() {
       clearTimeout(reconnectTimeoutRef.current);
       reconnectTimeoutRef.current = null;
     }
-    if (pollIntervalRef.current) {
-      clearInterval(pollIntervalRef.current);
-      pollIntervalRef.current = null;
+    if (pollTimeoutRef.current) {
+      clearTimeout(pollTimeoutRef.current);
+      pollTimeoutRef.current = null;
     }
+    if (countdownIntervalRef.current) {
+      clearInterval(countdownIntervalRef.current);
+      countdownIntervalRef.current = null;
+    }
+    setReconnectCountdown(null);
   }, []);
 
   const connect = useCallback(() => {
@@ -263,33 +259,14 @@ export function useAria2() {
 
       socket.onopen = () => {
         setStatus('connected');
-        // Start polling immediately using refs (avoids stale closures)
-        const reqs: { method: string; id: string; params?: any[] }[] = [
-          { method: 'aria2.getGlobalStat', id: 'globalStat' },
-          { method: 'aria2.tellActive', id: 'active' },
-          { method: 'aria2.tellWaiting', params: [0, 1000], id: 'waiting' },
-          { method: 'aria2.tellStopped', params: [0, 1000], id: 'stopped' }
-        ];
-        if (selectedGidRef.current) {
-          reqs.push({ method: 'aria2.getPeers', params: [selectedGidRef.current], id: 'getPeers' });
-          reqs.push({ method: 'aria2.getServers', params: [selectedGidRef.current], id: 'getServers' });
+        reconnectAttemptsRef.current = 0;
+        setReconnectCountdown(null);
+        if (countdownIntervalRef.current) {
+          clearInterval(countdownIntervalRef.current);
+          countdownIntervalRef.current = null;
         }
-        sendBatchRpcRef.current(reqs);
+        // Initial fetch of global options once
         sendRpcRef.current('aria2.getGlobalOption', [], 'getGlobalOption');
-        // Use ref-based poll for interval to always get fresh rpcSecret
-        pollIntervalRef.current = setInterval(() => {
-          const pollReqs: { method: string; id: string; params?: any[] }[] = [
-            { method: 'aria2.getGlobalStat', id: 'globalStat' },
-            { method: 'aria2.tellActive', id: 'active' },
-            { method: 'aria2.tellWaiting', params: [0, 1000], id: 'waiting' },
-            { method: 'aria2.tellStopped', params: [0, 1000], id: 'stopped' }
-          ];
-          if (selectedGidRef.current) {
-            pollReqs.push({ method: 'aria2.getPeers', params: [selectedGidRef.current], id: 'getPeers' });
-            pollReqs.push({ method: 'aria2.getServers', params: [selectedGidRef.current], id: 'getServers' });
-          }
-          sendBatchRpcRef.current(pollReqs);
-        }, 1000) as unknown as number;
       };
 
       socket.onmessage = (event) => {
@@ -297,12 +274,31 @@ export function useAria2() {
           const res = JSON.parse(event.data);
           // Handle both batch and single responses, and aria2 notifications
           if (Array.isArray(res)) {
-            res.forEach(r => handleSingleResponse(r));
-          } else if (res.method) {
-            // aria2 server-sent notification
-            handleAria2Notification(res);
-          } else if (res.id) {
-            handleSingleResponse(res);
+            res.forEach(r => {
+              if (r.id && pendingRequestsRef.current.has(r.id)) {
+                const promiseCallbacks = pendingRequestsRef.current.get(r.id);
+                if (promiseCallbacks) {
+                  if (r.error) promiseCallbacks.reject(r.error);
+                  else promiseCallbacks.resolve(r.result);
+                  pendingRequestsRef.current.delete(r.id);
+                }
+              }
+              handleSingleResponse(r);
+            });
+          } else {
+            if (res.id && pendingRequestsRef.current.has(res.id)) {
+              const promiseCallbacks = pendingRequestsRef.current.get(res.id);
+              if (promiseCallbacks) {
+                if (res.error) promiseCallbacks.reject(res.error);
+                else promiseCallbacks.resolve(res.result);
+                pendingRequestsRef.current.delete(res.id);
+              }
+            }
+            if (res.method) {
+              handleAria2Notification(res);
+            } else if (res.id) {
+              handleSingleResponse(res);
+            }
           }
         } catch (e) {
           console.error('Failed to parse RPC response:', e);
@@ -311,11 +307,33 @@ export function useAria2() {
 
       socket.onclose = () => {
         setStatus('disconnected');
-        if (pollIntervalRef.current) {
-          clearInterval(pollIntervalRef.current);
-          pollIntervalRef.current = null;
+        if (pollTimeoutRef.current) {
+          clearTimeout(pollTimeoutRef.current);
+          pollTimeoutRef.current = null;
         }
-        reconnectTimeoutRef.current = setTimeout(() => connect(), 3000) as unknown as number;
+        
+        reconnectAttemptsRef.current++;
+        const delay = Math.min(1000 * Math.pow(2, reconnectAttemptsRef.current), 30000);
+        let secondsLeft = Math.round(delay / 1000);
+        setReconnectCountdown(secondsLeft);
+
+        if (countdownIntervalRef.current) {
+          clearInterval(countdownIntervalRef.current);
+        }
+        countdownIntervalRef.current = setInterval(() => {
+          secondsLeft--;
+          if (secondsLeft <= 0) {
+            clearInterval(countdownIntervalRef.current);
+            countdownIntervalRef.current = null;
+            setReconnectCountdown(null);
+          } else {
+            setReconnectCountdown(secondsLeft);
+          }
+        }, 1000);
+
+        reconnectTimeoutRef.current = setTimeout(() => {
+          connect();
+        }, delay) as unknown as number;
       };
 
       socket.onerror = (e) => {
@@ -325,7 +343,29 @@ export function useAria2() {
     } catch (e) {
       console.error('Failed to initiate WebSocket:', e);
       setStatus('disconnected');
-      reconnectTimeoutRef.current = setTimeout(() => connect(), 3000) as unknown as number;
+      
+      reconnectAttemptsRef.current++;
+      const delay = Math.min(1000 * Math.pow(2, reconnectAttemptsRef.current), 30000);
+      let secondsLeft = Math.round(delay / 1000);
+      setReconnectCountdown(secondsLeft);
+
+      if (countdownIntervalRef.current) {
+        clearInterval(countdownIntervalRef.current);
+      }
+      countdownIntervalRef.current = setInterval(() => {
+        secondsLeft--;
+        if (secondsLeft <= 0) {
+          clearInterval(countdownIntervalRef.current);
+          countdownIntervalRef.current = null;
+          setReconnectCountdown(null);
+        } else {
+          setReconnectCountdown(secondsLeft);
+        }
+      }, 1000);
+
+      reconnectTimeoutRef.current = setTimeout(() => {
+        connect();
+      }, delay) as unknown as number;
     }
   }, [cleanup, handleSingleResponse]);
 
@@ -337,33 +377,156 @@ export function useAria2() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // User Actions
-  const addUri = useCallback((uri: string) => {
-    sendRpcRef.current('aria2.addUri', [[uri]], 'addUri');
-  }, []);
-
-  const addTorrent = useCallback((base64: string) => {
-    sendRpcRef.current('aria2.addTorrent', [base64], 'addTorrent');
-  }, []);
-
-  const pauseTask = useCallback((gid: string) => {
-    sendRpcRef.current('aria2.pause', [gid], 'pause');
-  }, []);
-
-  const resumeTask = useCallback((gid: string) => {
-    sendRpcRef.current('aria2.unpause', [gid], 'unpause');
-  }, []);
-
-  const removeTask = useCallback((gid: string, status: string) => {
-    if (status === 'active' || status === 'waiting' || status === 'paused') {
-      sendRpcRef.current('aria2.forceRemove', [gid], 'remove');
-    } else {
-      sendRpcRef.current('aria2.removeDownloadResult', [gid], 'removeResult');
+  // Polling logic
+  const poll = useCallback(() => {
+    if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
+      const reqs: { method: string; id: string; params?: any[] }[] = [
+        { method: 'aria2.getGlobalStat', id: 'globalStat' },
+        { method: 'aria2.tellActive', id: 'active' },
+        { method: 'aria2.tellWaiting', params: [0, 1000], id: 'waiting' },
+        { method: 'aria2.tellStopped', params: [0, 1000], id: 'stopped' }
+      ];
+      if (selectedGidRef.current) {
+        reqs.push({ method: 'aria2.getPeers', params: [selectedGidRef.current], id: 'getPeers' });
+        reqs.push({ method: 'aria2.getServers', params: [selectedGidRef.current], id: 'getServers' });
+      }
+      sendBatchRpcRef.current(reqs);
     }
   }, []);
 
+  const hasActiveTasks = activeTasks.length > 0 || Number(globalStat.numActive) > 0;
+  const hasActiveTasksRef = useRef(hasActiveTasks);
+  useEffect(() => {
+    hasActiveTasksRef.current = hasActiveTasks;
+  }, [hasActiveTasks]);
+
+  const scheduleNext = useCallback(() => {
+    if (pollTimeoutRef.current) {
+      clearTimeout(pollTimeoutRef.current);
+    }
+    if (status !== 'connected') return;
+
+    let delay = 3000;
+    if (document.hidden) {
+      delay = 10000;
+    } else if (hasActiveTasksRef.current) {
+      delay = 1000;
+    }
+
+    pollTimeoutRef.current = setTimeout(() => {
+      poll();
+      scheduleNext();
+    }, delay);
+  }, [status, poll]);
+
+  // Start/reschedule polling on connection status changes
+  useEffect(() => {
+    if (status === 'connected') {
+      poll();
+      scheduleNext();
+    }
+    return () => {
+      if (pollTimeoutRef.current) {
+        clearTimeout(pollTimeoutRef.current);
+      }
+    };
+  }, [status, poll, scheduleNext]);
+
+  // Reschedule immediately on visibility changes
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (status === 'connected') {
+        scheduleNext();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [status, scheduleNext]);
+
+  // Reschedule immediately on active task transitions
+  useEffect(() => {
+    if (status === 'connected') {
+      scheduleNext();
+    }
+  }, [hasActiveTasks, status, scheduleNext]);
+
+  // Reschedule immediately if selected task details are required
+  useEffect(() => {
+    if (status === 'connected' && selectedGid) {
+      poll();
+      scheduleNext();
+    }
+  }, [selectedGid, status, poll, scheduleNext]);
+
+  // User Actions (Promise-based)
+  const addUri = useCallback((uri: string, options?: Record<string, string>) => {
+    const id = `action_addUri_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+    return new Promise<any>((resolve, reject) => {
+      pendingRequestsRef.current.set(id, { resolve, reject });
+      sendRpcRef.current('aria2.addUri', [[uri], options || {}], id);
+    });
+  }, []);
+
+  const changeTaskOption = useCallback((gid: string, options: Record<string, string>) => {
+    const id = `action_changeOption_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+    return new Promise<any>((resolve, reject) => {
+      pendingRequestsRef.current.set(id, { resolve, reject });
+      sendRpcRef.current('aria2.changeOption', [gid, options], id);
+    });
+  }, []);
+
+  const getTaskOptions = useCallback((gid: string) => {
+    const id = `action_getOption_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+    return new Promise<any>((resolve, reject) => {
+      pendingRequestsRef.current.set(id, { resolve, reject });
+      sendRpcRef.current('aria2.getOption', [gid], id);
+    });
+  }, []);
+
+  const addTorrent = useCallback((base64: string) => {
+    const id = `action_addTorrent_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+    return new Promise<any>((resolve, reject) => {
+      pendingRequestsRef.current.set(id, { resolve, reject });
+      sendRpcRef.current('aria2.addTorrent', [base64], id);
+    });
+  }, []);
+
+  const pauseTask = useCallback((gid: string) => {
+    const id = `action_pause_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+    return new Promise<any>((resolve, reject) => {
+      pendingRequestsRef.current.set(id, { resolve, reject });
+      sendRpcRef.current('aria2.pause', [gid], id);
+    });
+  }, []);
+
+  const resumeTask = useCallback((gid: string) => {
+    const id = `action_unpause_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+    return new Promise<any>((resolve, reject) => {
+      pendingRequestsRef.current.set(id, { resolve, reject });
+      sendRpcRef.current('aria2.unpause', [gid], id);
+    });
+  }, []);
+
+  const removeTask = useCallback((gid: string, taskStatus: string) => {
+    const id = `action_remove_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+    return new Promise<any>((resolve, reject) => {
+      pendingRequestsRef.current.set(id, { resolve, reject });
+      if (taskStatus === 'active' || taskStatus === 'waiting' || taskStatus === 'paused') {
+        sendRpcRef.current('aria2.forceRemove', [gid], id);
+      } else {
+        sendRpcRef.current('aria2.removeDownloadResult', [gid], id);
+      }
+    });
+  }, []);
+
   const clearStopped = useCallback(() => {
-    sendRpcRef.current('aria2.purgeDownloadResult', [], 'purge');
+    const id = `action_purge_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+    return new Promise<any>((resolve, reject) => {
+      pendingRequestsRef.current.set(id, { resolve, reject });
+      sendRpcRef.current('aria2.purgeDownloadResult', [], id);
+    });
   }, []);
 
   const handleAria2Notification = useCallback((msg: any) => {
@@ -412,7 +575,9 @@ export function useAria2() {
     taskPeers,
     taskServers,
     speedHistory,
+    reconnectCountdown,
     setSelectedGid,
+    connect,
     addUri,
     addTorrent,
     pauseTask,
@@ -421,6 +586,8 @@ export function useAria2() {
     clearStopped,
     fetchGlobalOptions,
     updateGlobalOptions,
+    changeTaskOption,
+    getTaskOptions,
     acknowledgeEvent,
     clearEvents
   };

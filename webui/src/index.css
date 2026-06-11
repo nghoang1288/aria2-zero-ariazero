@@ -36,7 +36,7 @@
   --scroll-thumb: #cbd5e1;
 }
 
-/* Custom Scrollbar */
+/* Custom Scrollbar for Webkit */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -55,6 +55,12 @@
   background: var(--text-dim);
 }
 
+/* Custom Scrollbar for Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scroll-thumb) var(--scroll-track);
+}
+
 body {
   background-color: var(--bg-page);
   color: var(--text-main);
@@ -62,4 +68,3 @@ body {
   -webkit-font-smoothing: antialiased;
   transition: background-color 0.2s ease, color 0.2s ease;
 }
-

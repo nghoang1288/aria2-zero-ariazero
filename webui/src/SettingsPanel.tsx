@@ -195,11 +195,12 @@ function TextControl({
       placeholder={placeholder}
       onChange={handleChange}
       onBlur={handleBlur}
-      className="w-full bg-[#0e111b] border border-[#1e293b] rounded-lg px-3 py-2 text-xs text-slate-300 placeholder-slate-600 focus:outline-none focus:border-cyan-500/70 transition-colors"
+      className="w-full bg-input-bg border border-border-main rounded-lg px-3 py-2 text-xs text-slate-300 placeholder-slate-600 focus:outline-none focus:border-cyan-500/70 transition-colors"
     />
   );
 }
 
+// Custom appearance for numbers
 function NumberControl({
   value,
   min,
@@ -237,7 +238,7 @@ function NumberControl({
       step={step ?? 1}
       onChange={handleChange}
       onBlur={handleBlur}
-      className="w-full bg-[#0e111b] border border-[#1e293b] rounded-lg px-3 py-2 text-xs text-slate-300 placeholder-slate-600 focus:outline-none focus:border-cyan-500/70 transition-colors [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+      className="w-full bg-input-bg border border-border-main rounded-lg px-3 py-2 text-xs text-slate-300 placeholder-slate-600 focus:outline-none focus:border-cyan-500/70 transition-colors [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
     />
   );
 }
@@ -273,7 +274,7 @@ function TextareaControl({
       placeholder={placeholder}
       onChange={handleChange}
       onBlur={handleBlur}
-      className="w-full bg-[#0e111b] border border-[#1e293b] rounded-lg px-3 py-2 text-xs text-slate-300 placeholder-slate-600 focus:outline-none focus:border-cyan-500/70 transition-colors resize-y"
+      className="w-full bg-input-bg border border-border-main rounded-lg px-3 py-2 text-xs text-slate-300 placeholder-slate-600 focus:outline-none focus:border-cyan-500/70 transition-colors resize-y"
     />
   );
 }
@@ -291,7 +292,7 @@ function SelectControl({
     <select
       value={value}
       onChange={(e) => onCommit(e.target.value)}
-      className="w-full bg-[#0e111b] border border-[#1e293b] rounded-lg px-3 py-2 text-xs text-slate-300 focus:outline-none focus:border-cyan-500/70 transition-colors cursor-pointer appearance-none"
+      className="w-full bg-input-bg border border-border-main rounded-lg px-3 py-2 text-xs text-slate-300 focus:outline-none focus:border-cyan-500/70 transition-colors cursor-pointer appearance-none"
       style={{
         backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%2394a3b8' viewBox='0 0 24 24'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")`,
         backgroundRepeat: 'no-repeat',
@@ -345,8 +346,8 @@ function ConnectionSection({ connectionStatus }: { connectionStatus: SettingsPan
   ];
 
   return (
-    <div className="bg-[#151926] border border-[#1e293b] rounded-xl overflow-hidden">
-      <div className="flex items-center justify-between px-5 py-4 border-b border-[#1e293b]">
+    <div className="bg-card-bg border border-border-main rounded-xl overflow-hidden">
+      <div className="flex items-center justify-between px-5 py-4 border-b border-border-main">
         <div className="flex items-center gap-2.5">
           <div className="bg-cyan-500/10 p-1.5 rounded-lg border border-cyan-500/20 text-cyan-400">
             <Server className="w-4 h-4" />
@@ -362,7 +363,7 @@ function ConnectionSection({ connectionStatus }: { connectionStatus: SettingsPan
             <span className="text-[11px] text-slate-500 uppercase tracking-wider font-medium block mb-1.5">
               {i.label}
             </span>
-            <div className="bg-[#0e111b] border border-[#1e293b] rounded-lg px-3 py-2 text-xs text-slate-300 font-mono">
+            <div className="bg-input-bg border border-border-main rounded-lg px-3 py-2 text-xs text-slate-300 font-mono">
               {i.value}
             </div>
           </div>
@@ -388,7 +389,7 @@ function SettingsSection({
   const [expanded, setExpanded] = useState(true);
 
   return (
-    <div className="bg-[#151926] border border-[#1e293b] rounded-xl overflow-hidden">
+    <div className="bg-card-bg border border-border-main rounded-xl overflow-hidden">
       {/* Header */}
       <button
         type="button"
@@ -411,7 +412,7 @@ function SettingsSection({
 
       {/* Body */}
       {expanded && (
-        <div className="border-t border-[#1e293b] divide-y divide-[#1e293b]">
+        <div className="border-t border-border-main divide-y divide-border-main">
           {section.options.map((opt) => (
             <OptionRow key={opt.key} opt={opt} value={globalOptions[opt.key] ?? ''} onUpdate={onUpdate} />
           ))}
@@ -440,7 +441,7 @@ function OptionRow({
     switch (opt.type) {
       case 'readonly':
         return (
-          <div className="bg-[#0e111b] border border-[#1e293b] rounded-lg px-3 py-2 text-xs text-slate-400 font-mono flex items-center gap-1.5">
+          <div className="bg-input-bg border border-border-main rounded-lg px-3 py-2 text-xs text-slate-400 font-mono flex items-center gap-1.5">
             <Folder className="w-3 h-3 text-slate-500 shrink-0" />
             <span className="truncate">{value || '—'}</span>
           </div>
@@ -512,7 +513,7 @@ export default function SettingsPanel({
           type="button"
           onClick={handleRefresh}
           className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium
-                     bg-[#151926] border border-[#1e293b] text-slate-300
+                     bg-card-bg border border-border-main text-slate-300
                      hover:border-cyan-500/40 hover:text-cyan-400 transition-colors"
         >
           <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
@@ -528,6 +529,9 @@ export default function SettingsPanel({
 
       {/* Smart Download Preferences */}
       <SmartDownloadSettingsSection />
+
+      {/* AriaZero Pro Features */}
+      <AriaZeroFeaturesSection />
 
       {/* Option sections */}
       {SECTIONS.map((section) => (
@@ -562,7 +566,7 @@ function SchedulerSection() {
   };
 
   return (
-    <div className="bg-[#151926] border border-[#1e293b] rounded-xl overflow-hidden mb-6">
+    <div className="bg-card-bg border border-border-main rounded-xl overflow-hidden mb-6">
       {/* Header */}
       <button
         type="button"
@@ -585,7 +589,7 @@ function SchedulerSection() {
 
       {/* Body */}
       {expanded && (
-        <div className="border-t border-[#1e293b] divide-y divide-[#1e293b]">
+        <div className="border-t border-border-main divide-y divide-border-main">
           {/* Toggle Enabled */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-5 py-3.5 hover:bg-slate-800/10 transition-colors">
             <div className="sm:max-w-[55%]">
@@ -617,7 +621,7 @@ function SchedulerSection() {
                   setStart(e.target.value);
                   update('ariazero_scheduler_start', e.target.value);
                 }}
-                className="w-1/2 bg-[#0e111b] border border-[#1e293b] rounded-lg px-2 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-cyan-500/70"
+                className="w-1/2 bg-input-bg border border-border-main rounded-lg px-2 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-cyan-500/70"
               />
               <span className="text-slate-500 text-xs">to</span>
               <input
@@ -627,7 +631,7 @@ function SchedulerSection() {
                   setEnd(e.target.value);
                   update('ariazero_scheduler_end', e.target.value);
                 }}
-                className="w-1/2 bg-[#0e111b] border border-[#1e293b] rounded-lg px-2 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-cyan-500/70"
+                className="w-1/2 bg-input-bg border border-border-main rounded-lg px-2 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-cyan-500/70"
               />
             </div>
           </div>
@@ -646,7 +650,7 @@ function SchedulerSection() {
                   setDlLimit(e.target.value);
                   update('ariazero_scheduler_dl_limit', e.target.value);
                 }}
-                className="w-full bg-[#0e111b] border border-[#1e293b] rounded-lg px-3 py-2 text-xs text-slate-300 focus:outline-none focus:border-cyan-500/70"
+                className="w-full bg-input-bg border border-border-main rounded-lg px-3 py-2 text-xs text-slate-300 focus:outline-none focus:border-cyan-500/70"
               />
             </div>
           </div>
@@ -665,7 +669,7 @@ function SchedulerSection() {
                   setUlLimit(e.target.value);
                   update('ariazero_scheduler_ul_limit', e.target.value);
                 }}
-                className="w-full bg-[#0e111b] border border-[#1e293b] rounded-lg px-3 py-2 text-xs text-slate-300 focus:outline-none focus:border-cyan-500/70"
+                className="w-full bg-input-bg border border-border-main rounded-lg px-3 py-2 text-xs text-slate-300 focus:outline-none focus:border-cyan-500/70"
               />
             </div>
           </div>
@@ -684,7 +688,7 @@ function SchedulerSection() {
                   setDlNormal(e.target.value);
                   update('ariazero_scheduler_dl_normal', e.target.value);
                 }}
-                className="w-full bg-[#0e111b] border border-[#1e293b] rounded-lg px-3 py-2 text-xs text-slate-300 focus:outline-none focus:border-cyan-500/70"
+                className="w-full bg-input-bg border border-border-main rounded-lg px-3 py-2 text-xs text-slate-300 focus:outline-none focus:border-cyan-500/70"
               />
             </div>
           </div>
@@ -703,7 +707,7 @@ function SchedulerSection() {
                   setUlNormal(e.target.value);
                   update('ariazero_scheduler_ul_normal', e.target.value);
                 }}
-                className="w-full bg-[#0e111b] border border-[#1e293b] rounded-lg px-3 py-2 text-xs text-slate-300 focus:outline-none focus:border-cyan-500/70"
+                className="w-full bg-input-bg border border-border-main rounded-lg px-3 py-2 text-xs text-slate-300 focus:outline-none focus:border-cyan-500/70"
               />
             </div>
           </div>
@@ -732,7 +736,7 @@ function SmartDownloadSettingsSection() {
   };
 
   return (
-    <div className="bg-[#151926] border border-[#1e293b] rounded-xl overflow-hidden mb-6">
+    <div className="bg-card-bg border border-border-main rounded-xl overflow-hidden mb-6">
       {/* Header */}
       <button
         type="button"
@@ -755,7 +759,7 @@ function SmartDownloadSettingsSection() {
 
       {/* Body */}
       {expanded && (
-        <div className="border-t border-[#1e293b] divide-y divide-[#1e293b]">
+        <div className="border-t border-border-main divide-y divide-border-main">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-5 py-3.5 hover:bg-slate-800/10 transition-colors">
             <div className="sm:max-w-[55%]">
               <span className="text-xs font-semibold text-slate-200 block">Allowed File Extensions</span>
@@ -767,7 +771,256 @@ function SmartDownloadSettingsSection() {
                 value={extensions}
                 onChange={handleChange}
                 placeholder="e.g. zip,rar,mp4,gguf"
-                className="w-full bg-[#0e111b] border border-[#1e293b] rounded-lg px-3 py-2 text-xs text-slate-300 focus:outline-none focus:border-cyan-500/70 font-mono"
+                className="w-full bg-input-bg border border-border-main rounded-lg px-3 py-2 text-xs text-slate-300 focus:outline-none focus:border-cyan-500/70 font-mono"
+              />
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function AriaZeroFeaturesSection() {
+  const [expanded, setExpanded] = useState(true);
+
+  // Auto-Retry State
+  const [retryEnabled, setRetryEnabled] = useState(() => {
+    const val = localStorage.getItem('ariazero_auto_retry_enabled');
+    return val === null ? true : val === 'true';
+  });
+  const [retryCount, setRetryCount] = useState(() => {
+    return Number(localStorage.getItem('ariazero_auto_retry_count') || '3');
+  });
+  const [retryDelay, setRetryDelay] = useState(() => {
+    return Number(localStorage.getItem('ariazero_auto_retry_delay') || '5');
+  });
+
+  // Auto-Categorize State
+  const [categorizeEnabled, setCategorizeEnabled] = useState(() => {
+    const val = localStorage.getItem('ariazero_auto_categorize_enabled');
+    return val === null ? true : val === 'true';
+  });
+  const [videoFolder, setVideoFolder] = useState(() => {
+    return localStorage.getItem('ariazero_video_folder') || 'Video';
+  });
+  const [audioFolder, setAudioFolder] = useState(() => {
+    return localStorage.getItem('ariazero_audio_folder') || 'Audio';
+  });
+  const [docFolder, setDocFolder] = useState(() => {
+    return localStorage.getItem('ariazero_doc_folder') || 'Documents';
+  });
+  const [softwareFolder, setSoftwareFolder] = useState(() => {
+    return localStorage.getItem('ariazero_software_folder') || 'Software';
+  });
+
+  // Sound Notification State
+  const [soundEnabled, setSoundEnabled] = useState(() => {
+    const val = localStorage.getItem('ariazero_sound_enabled');
+    return val === null ? true : val === 'true';
+  });
+
+  const update = (key: string, value: string) => {
+    localStorage.setItem(key, value);
+    window.dispatchEvent(new Event('ariazero_settings_changed'));
+  };
+
+  return (
+    <div className="bg-card-bg border border-border-main rounded-xl overflow-hidden mb-6">
+      {/* Header */}
+      <button
+        type="button"
+        onClick={() => setExpanded((p) => !p)}
+        className="w-full flex items-center justify-between px-5 py-4 text-left group hover:bg-slate-800/20 transition-colors"
+      >
+        <div className="flex items-center gap-2.5">
+          <div className="bg-cyan-500/10 p-1.5 rounded-lg border border-cyan-500/20 text-cyan-400">
+            <Wrench className="w-4 h-4" />
+          </div>
+          <h2 className="text-sm font-semibold text-slate-200">AriaZero Pro Features</h2>
+          <span className="text-[10px] text-slate-600 font-mono">
+            (Auto-Retry, Categorization, Sound alerts)
+          </span>
+        </div>
+        <ChevronDown
+          className={`w-4 h-4 text-slate-500 transition-transform duration-200 ${expanded ? 'rotate-0' : '-rotate-90'}`}
+        />
+      </button>
+
+      {/* Body */}
+      {expanded && (
+        <div className="border-t border-border-main divide-y divide-border-main">
+          {/* Section Subtitle: Auto-Retry */}
+          <div className="px-5 py-2.5 bg-slate-800/20">
+            <span className="text-xs font-semibold text-cyan-400 uppercase tracking-wider">Auto-Retry on Error</span>
+          </div>
+
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-5 py-3.5 hover:bg-slate-800/10 transition-colors">
+            <div className="sm:max-w-[55%]">
+              <span className="text-xs font-semibold text-slate-200 block">Enable Auto-Retry</span>
+              <span className="text-[10px] text-slate-500">Automatically retry failed downloads</span>
+            </div>
+            <div>
+              <ToggleSwitch
+                checked={retryEnabled}
+                onChange={(val) => {
+                  setRetryEnabled(val);
+                  update('ariazero_auto_retry_enabled', String(val));
+                }}
+              />
+            </div>
+          </div>
+
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-5 py-3.5 hover:bg-slate-800/10 transition-colors">
+            <div className="sm:max-w-[55%]">
+              <span className="text-xs font-semibold text-slate-200 block">Max Retry Attempts</span>
+              <span className="text-[10px] text-slate-500">Number of retries before giving up</span>
+            </div>
+            <div className="w-full sm:w-56">
+              <input
+                type="number"
+                min={0}
+                value={retryCount}
+                onChange={(e) => {
+                  const val = Number(e.target.value);
+                  setRetryCount(val);
+                  update('ariazero_auto_retry_count', String(val));
+                }}
+                className="w-full bg-input-bg border border-border-main rounded-lg px-3 py-2 text-xs text-slate-300 focus:outline-none focus:border-cyan-500/70"
+              />
+            </div>
+          </div>
+
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-5 py-3.5 hover:bg-slate-800/10 transition-colors">
+            <div className="sm:max-w-[55%]">
+              <span className="text-xs font-semibold text-slate-200 block">Retry Delay (Seconds)</span>
+              <span className="text-[10px] text-slate-500">Wait time before each retry attempt</span>
+            </div>
+            <div className="w-full sm:w-56">
+              <input
+                type="number"
+                min={1}
+                value={retryDelay}
+                onChange={(e) => {
+                  const val = Number(e.target.value);
+                  setRetryDelay(val);
+                  update('ariazero_auto_retry_delay', String(val));
+                }}
+                className="w-full bg-input-bg border border-border-main rounded-lg px-3 py-2 text-xs text-slate-300 focus:outline-none focus:border-cyan-500/70"
+              />
+            </div>
+          </div>
+
+          {/* Section Subtitle: Auto-Categorize */}
+          <div className="px-5 py-2.5 bg-slate-800/20 border-t border-border-main">
+            <span className="text-xs font-semibold text-cyan-400 uppercase tracking-wider">Auto-Categorize Downloads</span>
+          </div>
+
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-5 py-3.5 hover:bg-slate-800/10 transition-colors">
+            <div className="sm:max-w-[55%]">
+              <span className="text-xs font-semibold text-slate-200 block">Enable Auto-Categorize</span>
+              <span className="text-[10px] text-slate-500">Route files to folders based on file extensions</span>
+            </div>
+            <div>
+              <ToggleSwitch
+                checked={categorizeEnabled}
+                onChange={(val) => {
+                  setCategorizeEnabled(val);
+                  update('ariazero_auto_categorize_enabled', String(val));
+                }}
+              />
+            </div>
+          </div>
+
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-5 py-3.5 hover:bg-slate-800/10 transition-colors">
+            <div className="sm:max-w-[55%]">
+              <span className="text-xs font-semibold text-slate-200 block">Video Subfolder</span>
+              <span className="text-[10px] text-slate-500">Subfolder path under the download folder</span>
+            </div>
+            <div className="w-full sm:w-56">
+              <input
+                type="text"
+                value={videoFolder}
+                onChange={(e) => {
+                  setVideoFolder(e.target.value);
+                  update('ariazero_video_folder', e.target.value);
+                }}
+                className="w-full bg-input-bg border border-border-main rounded-lg px-3 py-2 text-xs text-slate-300 focus:outline-none focus:border-cyan-500/70"
+              />
+            </div>
+          </div>
+
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-5 py-3.5 hover:bg-slate-800/10 transition-colors">
+            <div className="sm:max-w-[55%]">
+              <span className="text-xs font-semibold text-slate-200 block">Audio Subfolder</span>
+              <span className="text-[10px] text-slate-500">Subfolder path under the download folder</span>
+            </div>
+            <div className="w-full sm:w-56">
+              <input
+                type="text"
+                value={audioFolder}
+                onChange={(e) => {
+                  setAudioFolder(e.target.value);
+                  update('ariazero_audio_folder', e.target.value);
+                }}
+                className="w-full bg-input-bg border border-border-main rounded-lg px-3 py-2 text-xs text-slate-300 focus:outline-none focus:border-cyan-500/70"
+              />
+            </div>
+          </div>
+
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-5 py-3.5 hover:bg-slate-800/10 transition-colors">
+            <div className="sm:max-w-[55%]">
+              <span className="text-xs font-semibold text-slate-200 block">Documents Subfolder</span>
+              <span className="text-[10px] text-slate-500">Subfolder path under the download folder</span>
+            </div>
+            <div className="w-full sm:w-56">
+              <input
+                type="text"
+                value={docFolder}
+                onChange={(e) => {
+                  setDocFolder(e.target.value);
+                  update('ariazero_doc_folder', e.target.value);
+                }}
+                className="w-full bg-input-bg border border-border-main rounded-lg px-3 py-2 text-xs text-slate-300 focus:outline-none focus:border-cyan-500/70"
+              />
+            </div>
+          </div>
+
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-5 py-3.5 hover:bg-slate-800/10 transition-colors">
+            <div className="sm:max-w-[55%]">
+              <span className="text-xs font-semibold text-slate-200 block">Software Subfolder</span>
+              <span className="text-[10px] text-slate-500">Subfolder path under the download folder</span>
+            </div>
+            <div className="w-full sm:w-56">
+              <input
+                type="text"
+                value={softwareFolder}
+                onChange={(e) => {
+                  setSoftwareFolder(e.target.value);
+                  update('ariazero_software_folder', e.target.value);
+                }}
+                className="w-full bg-input-bg border border-border-main rounded-lg px-3 py-2 text-xs text-slate-300 focus:outline-none focus:border-cyan-500/70"
+              />
+            </div>
+          </div>
+
+          {/* Section Subtitle: Notification */}
+          <div className="px-5 py-2.5 bg-slate-800/20 border-t border-border-main">
+            <span className="text-xs font-semibold text-cyan-400 uppercase tracking-wider">Notification Sound</span>
+          </div>
+
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-5 py-3.5 hover:bg-slate-800/10 transition-colors">
+            <div className="sm:max-w-[55%]">
+              <span className="text-xs font-semibold text-slate-200 block">Complete Sound Alert</span>
+              <span className="text-[10px] text-slate-500">Play a chime sound when a download completes</span>
+            </div>
+            <div>
+              <ToggleSwitch
+                checked={soundEnabled}
+                onChange={(val) => {
+                  setSoundEnabled(val);
+                  update('ariazero_sound_enabled', String(val));
+                }}
               />
             </div>
           </div>

@@ -58,14 +58,19 @@ fi
 
 
 # Ensure permissions on configuration and downloads folders
-chmod -R 777 "$DOWNLOAD_DIR" "$CONF_DIR"
+chmod -R 777 "$DOWNLOAD_DIR"
+chmod 755 "$CONF_DIR"
+chmod 644 "$CONF_FILE" "$SESSION_FILE" 2>/dev/null || true
 
-# Generate config.js for AriaZero containing the RPC Secret from environment variables
+# Generate config.js for AriaZero containing the RPC Secret and SMB credentials
 cat <<EOF > /var/www/html/config.js
 window.AriaZeroServerConfig = {
-  rpcSecret: "${ARIA2_RPC_SECRET}"
+  rpcSecret: "${ARIA2_RPC_SECRET}",
+  smbUser: "${SMB_USER:-admin}",
+  smbPassword: "${SMB_PASSWORD:-123456}"
 };
 EOF
+
 
 # Set up Samba configuration
 SMB_CONF="/etc/samba/smb.conf"
