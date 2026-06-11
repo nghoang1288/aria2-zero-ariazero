@@ -905,7 +905,7 @@ function AppContent({
                 <div className="bg-card-bg border border-border-main rounded-xl p-5 flex items-center justify-between">
                   <div>
                     <span className="text-xs text-text-dim font-medium block mb-1">Active Downloads</span>
-                    <span className="text-2xl font-bold text-text-main">{globalStat.numActive}</span>
+                    <span className="text-2xl font-bold text-text-main">{activeCount}</span>
                   </div>
                   <div className="bg-cyan-500/10 border border-cyan-500/20 p-3 rounded-lg text-cyan-400">
                     <ArrowDown className="w-5 h-5" />
@@ -915,7 +915,7 @@ function AppContent({
                 <div className="bg-card-bg border border-border-main rounded-xl p-5 flex items-center justify-between">
                   <div>
                     <span className="text-xs text-text-dim font-medium block mb-1">Completed Files</span>
-                    <span className="text-2xl font-bold text-text-main">{globalStat.numStopped}</span>
+                    <span className="text-2xl font-bold text-text-main">{completedCount}</span>
                   </div>
                   <div className="bg-emerald-500/10 border border-emerald-500/20 p-3 rounded-lg text-emerald-400">
                     <CheckCircle className="w-5 h-5" />
@@ -925,7 +925,7 @@ function AppContent({
                 <div className="bg-card-bg border border-border-main rounded-xl p-5 flex items-center justify-between">
                   <div>
                     <span className="text-xs text-text-dim font-medium block mb-1">Queue / Paused</span>
-                    <span className="text-2xl font-bold text-text-main">{globalStat.numWaiting}</span>
+                    <span className="text-2xl font-bold text-text-main">{allActiveAndWaiting.filter((t: Aria2Task) => (t.status === 'paused' || t.status === 'waiting') && !isMetadataTask(t)).length}</span>
                   </div>
                   <div className="bg-amber-500/10 border border-amber-500/20 p-3 rounded-lg text-amber-400">
                     <Clock className="w-5 h-5" />

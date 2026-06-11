@@ -27,6 +27,7 @@ max-connection-per-server=16
 min-split-size=10M
 split=16
 max-concurrent-downloads=5
+allow-overwrite=true
 EOF
 fi
 
